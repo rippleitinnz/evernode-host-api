@@ -1,0 +1,16 @@
+[Unit]
+Description=Evernode Host Discovery API
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/evernode-host-api
+ExecStart=/root/.nvm/versions/node/v22.16.0/bin/node /home/evernode-host-api/evernode-host-api.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
