@@ -5,7 +5,7 @@
  * Maintains a real-time cache of all Evernode host data via local Xahau node.
  * Serves filtered host queries instantly via REST API.
  *
- * Usage: node server.js
+ * Usage: node evernode-host-api.js
  */
 
 'use strict';
@@ -184,7 +184,6 @@ const fullScan = async () => {
     console.log('[Scan] Starting full host scan...');
 
     try {
-        // Fetch host list from XRPLWin
         const data = await new Promise((resolve, reject) => {
             https.get(XRPLWIN_API, res => {
                 let d = ''; res.on('data', c => d += c);
@@ -202,18 +201,14 @@ const fullScan = async () => {
 
         let processed = 0, active = 0;
 
-        // Process in batches
         for (let i = 0; i < allAddresses.length; i += BATCH_SIZE) {
             const batch = allAddresses.slice(i, i + BATCH_SIZE);
 
-            // Fetch host info in parallel
             const infos = await Promise.all(batch.map(addr => fetchHostInfo(addr)));
 
-            // Fetch balances for active hosts only
             const activeInBatch = infos.filter(info => info?.active).map(info => info.address);
             const balances = activeInBatch.length > 0 ? await fetchBalances(activeInBatch) : {};
 
-            // Upsert to DB
             const upsertMany = db.transaction((rows) => { rows.forEach(r => upsertHost.run(r)); });
             const rows = infos
                 .filter(info => info !== null)
@@ -244,7 +239,6 @@ const updateHost = async (address) => {
     try {
         const info = await fetchHostInfo(address);
         if (!info) return;
-        // Keep existing balance from DB — only updated during full scan
         const existing = db.prepare('SELECT xahBalance, evrBalance FROM hosts WHERE address = ?').get(address);
         upsertHost.run(hostToRow(info, { xah: existing?.xahBalance || 0, evr: existing?.evrBalance || 0 }));
         console.log(`[Heartbeat] Updated ${address} | active=${info.active} slots=${info.maxInstances-info.activeInstances} rep=${info.hostReputation}`);
@@ -292,7 +286,6 @@ const subscribeHeartbeat = () => {
 const app = express();
 app.use(express.json());
 
-// CORS for public access
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Content-Type');
@@ -313,6 +306,7 @@ app.get('/hosts', (req, res) => {
         minLease,
         maxLease,
         country,
+        domain,
         version,
         minRam,
         minDisk,
@@ -343,6 +337,7 @@ app.get('/hosts', (req, res) => {
     if (minLease !== undefined)  { where.push('leaseDrops >= ?');            params.push(parseInt(minLease)); }
     if (maxLease !== undefined)  { where.push('leaseDrops <= ?');            params.push(parseInt(maxLease)); }
     if (country !== undefined)   { where.push('countryCode = ?');            params.push(country.toUpperCase()); }
+    if (domain !== undefined)    { where.push('domain LIKE ?');              params.push('%' + domain + '%'); }
     if (version !== undefined)   { where.push('version = ?');                params.push(version); }
     if (minRam !== undefined)    { where.push('ramMb >= ?');                 params.push(parseInt(minRam)); }
     if (minDisk !== undefined)   { where.push('diskMb >= ?');                params.push(parseInt(minDisk)); }
@@ -372,7 +367,7 @@ app.get('/hosts', (req, res) => {
 
 // GET /hosts/random — random sample with optional filters
 app.get('/hosts/random', (req, res) => {
-    const { count = 10, minRep, minSlots, country, active = 'true' } = req.query;
+    const { count = 10, minRep, minSlots, country, domain, active = 'true' } = req.query;
     const limit = Math.min(parseInt(count) || 10, 200);
 
     let where = [];
@@ -382,6 +377,7 @@ app.get('/hosts/random', (req, res) => {
     if (minRep !== undefined)   { where.push('hostReputation >= ?');       params.push(parseInt(minRep)); }
     if (minSlots !== undefined) { where.push('availableInstances >= ?');   params.push(parseInt(minSlots)); }
     if (country !== undefined)  { where.push('countryCode = ?');           params.push(country.toUpperCase()); }
+    if (domain !== undefined)   { where.push('domain LIKE ?');             params.push('%' + domain + '%'); }
 
     const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
     const sql = `SELECT * FROM hosts ${whereClause} ORDER BY RANDOM() LIMIT ?`;
@@ -400,6 +396,34 @@ app.get('/hosts/:address', (req, res) => {
     const host = db.prepare('SELECT * FROM hosts WHERE address = ?').get(req.params.address);
     if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
     res.json({ success: true, host });
+});
+
+// GET /versions — Sashimono version distribution
+app.get('/versions', (req, res) => {
+    const versions = db.prepare(`
+        SELECT version, COUNT(*) as count
+        FROM hosts
+        WHERE version IS NOT NULL AND active = 1
+        GROUP BY version
+        ORDER BY count DESC
+    `).all();
+    res.json({ success: true, versions });
+});
+
+// GET /countries — host counts by country
+app.get('/countries', (req, res) => {
+    const countries = db.prepare(`
+        SELECT
+            countryCode,
+            COUNT(*) as total,
+            SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) as active,
+            SUM(CASE WHEN active=1 THEN availableInstances ELSE 0 END) as availableSlots
+        FROM hosts
+        WHERE countryCode IS NOT NULL
+        GROUP BY countryCode
+        ORDER BY total DESC
+    `).all();
+    res.json({ success: true, countries });
 });
 
 // GET /stats — network summary
@@ -440,7 +464,7 @@ app.get('/stats', (req, res) => {
     });
 });
 
-// GET /scan — trigger manual rescan (for admin use)
+// POST /scan — trigger manual rescan (admin use only, not exposed publicly)
 app.post('/scan', (req, res) => {
     if (scanInProgress) {
         return res.json({ success: false, message: 'Scan already in progress' });
@@ -463,35 +487,6 @@ app.get('/health', (req, res) => {
     });
 });
 
-// GET /versions — Sashimono version distribution
-app.get('/versions', (req, res) => {
-    const versions = db.prepare(`
-        SELECT version, COUNT(*) as count
-        FROM hosts
-        WHERE version IS NOT NULL AND active = 1
-        GROUP BY version
-        ORDER BY count DESC
-    `).all();
-    res.json({ success: true, versions });
-});
-
-// GET /countries — host counts by country
-app.get('/countries', (req, res) => {
-    const countries = db.prepare(`
-        SELECT
-            countryCode,
-            COUNT(*) as total,
-            SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) as active,
-            SUM(CASE WHEN active=1 THEN availableInstances ELSE 0 END) as availableSlots
-        FROM hosts
-        WHERE countryCode IS NOT NULL
-        GROUP BY countryCode
-        ORDER BY total DESC
-    `).all();
-    res.json({ success: true, countries });
-});
-
-
 // ── Startup ───────────────────────────────────────────────────
 const main = async () => {
     console.log('╔════════════════════════════════════════╗');
@@ -504,15 +499,12 @@ const main = async () => {
 
     await initEvernode();
 
-    // Start REST API
     app.listen(API_PORT, () => {
         console.log(`[API] Listening on http://localhost:${API_PORT}`);
     });
 
-    // Subscribe to heartbeats for real-time updates
     subscribeHeartbeat();
 
-    // Check if we need an initial scan
     const lastScan = getMeta('lastFullScan');
     const hostCount = db.prepare('SELECT COUNT(*) as count FROM hosts').get()?.count || 0;
 
@@ -529,7 +521,6 @@ const main = async () => {
         }
     }
 
-    // Schedule hourly rescan
     setInterval(() => {
         console.log('[API] 6-hourly rescan triggered');
         fullScan();
