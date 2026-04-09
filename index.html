@@ -227,8 +227,17 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
 </div>
 
 <div class="section" id="endpoints">
-  <div class="section-label">02 — Endpoints</div>
-  <h2>API reference</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('endpoints-body','endpoints-toggle-label','endpoints-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">02 — Endpoints</div>
+      <h2 style="margin-bottom:0;">API reference</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="endpoints-toggle-label">Expand</span>
+      <span id="endpoints-toggle-icon">▼</span>
+    </div>
+  </div>
+  <div id="endpoints-body" style="display:none;margin-top:1.5rem;">
   <div class="endpoints">
     <div class="endpoint">
       <div class="endpoint-header" onclick="toggle(this)">
@@ -262,6 +271,34 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
     </div>
     <div class="endpoint">
       <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/random</span><span class="endpoint-desc">Random host sample</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a randomly selected set of hosts matching the given filters. Useful for load distribution across equivalent hosts without client-side shuffling.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>count</td><td>integer</td><td>10</td><td>Number of random hosts to return (max 200)</td></tr>
+          <tr><td>minRep</td><td>integer</td><td>—</td><td>Minimum reputation score</td></tr>
+          <tr><td>minSlots</td><td>integer</td><td>—</td><td>Minimum available slots</td></tr>
+          <tr><td>country</td><td>string</td><td>—</td><td>Filter by country code</td></tr>
+          <tr><td>active</td><td>boolean</td><td>true</td><td>Filter by active status</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/countries</span><span class="endpoint-desc">Host counts by country</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all countries with registered hosts, including total host count, active host count and available slots per country. Useful for building country filter dropdowns or geographic dashboards.</p></div>
+    </div>
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/versions</span><span class="endpoint-desc">Sashimono version distribution</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all active Sashimono versions with host counts. Useful for filtering to a specific version or understanding network upgrade adoption.</p></div>
+    </div>
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
         <span class="method get">GET</span><span class="endpoint-path">/stats</span><span class="endpoint-desc">Network summary statistics</span>
       </div>
       <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Network-wide statistics: total and active host counts, available slots, average reputation and balances, top countries by host count, and version distribution.</p></div>
@@ -272,14 +309,23 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
       </div>
       <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns API status, host count, last full scan timestamp and whether a scan is currently in progress.</p></div>
     </div>
-
+  </div>
   </div>
 </div>
 
 <div class="section" id="examples">
-  <div class="section-label">03 — Examples</div>
-  <h2>Query examples</h2>
-  <p style="color:var(--text2);margin-bottom:2.5rem;max-width:600px;line-height:1.75;">Common queries shown in curl, browser fetch, and Node.js. All examples target <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">https://api.onledger.net</code>.</p>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('examples-body','examples-toggle-label','examples-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">03 — Examples</div>
+      <h2 style="margin-bottom:0;">Query examples</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="examples-toggle-label">Expand</span>
+      <span id="examples-toggle-icon">▼</span>
+    </div>
+  </div>
+  <div id="examples-body" style="display:none;margin-top:1.5rem;">
+  <p style="color:var(--text2);margin-bottom:2.5rem;margin-top:1.5rem;max-width:600px;line-height:1.75;">Common queries shown in curl, browser fetch, and Node.js. All examples target <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">https://api.onledger.net</code>.</p>
 
   <div class="examples-grid">
 
@@ -457,6 +503,7 @@ console.log(host);</div>
     </div>
 
   </div>
+  </div>
 </div>
 
 <div class="section" id="builder">
@@ -584,6 +631,16 @@ console.log(host);</div>
     btn.classList.add('active');
     document.querySelectorAll(`[id^="${prefix}-"]`).forEach(el => el.style.display = 'none');
     document.getElementById(`${prefix}-${lang}`).style.display = 'block';
+  }
+
+  function toggleSection(bodyId, labelId, iconId) {
+    const body = document.getElementById(bodyId);
+    const label = document.getElementById(labelId);
+    const icon = document.getElementById(iconId);
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? 'block' : 'none';
+    label.textContent = collapsed ? 'Collapse' : 'Expand';
+    icon.textContent = collapsed ? '▲' : '▼';
   }
 
   function toggle(header) { header.nextElementSibling.classList.toggle('open'); }
