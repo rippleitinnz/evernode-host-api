@@ -18,6 +18,7 @@ const Database = require('better-sqlite3');
 const express  = require('express');
 
 // ── Config ────────────────────────────────────────────────────
+const VERSION           = '1.1.0';
 const XAHAU_WS          = process.env.XAHAU_WS        || 'ws://localhost:6008';
 const API_PORT          = parseInt(process.env.API_PORT || '3001');
 const HEARTBEAT_ACCOUNT = 'rHktfGUbjqzU4GsYCMc1pDjdHXb5CJamto';
@@ -432,6 +433,9 @@ app.get('/stats', (req, res) => {
         SELECT
             COUNT(*) as totalHosts,
             SUM(active) as activeHosts,
+            SUM(CASE WHEN active=1 THEN maxInstances END) as totalInstances,
+            SUM(CASE WHEN active=1 THEN activeInstances END) as activeInstances,
+            SUM(CASE WHEN active=1 THEN availableInstances END) as totalAvailableInstances,
             SUM(availableInstances) as totalAvailableSlots,
             SUM(maxInstances) as totalSlots,
             AVG(CASE WHEN active=1 THEN hostReputation END) as avgReputation,
@@ -480,6 +484,7 @@ app.get('/health', (req, res) => {
     res.json({
         success: true,
         status: 'ok',
+        version: VERSION,
         hostCount,
         activeCount,
         lastFullScan: getMeta('lastFullScan'),
@@ -492,6 +497,7 @@ const main = async () => {
     console.log('╔════════════════════════════════════════╗');
     console.log('║   Evernode Host Discovery API          ║');
     console.log('╚════════════════════════════════════════╝');
+    console.log(`  Version    : ${VERSION}`);
     console.log(`  Xahau node : ${XAHAU_WS}`);
     console.log(`  API port   : ${API_PORT}`);
     console.log(`  Database   : ${DB_PATH}`);
