@@ -80,7 +80,8 @@
   .section-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
   .section h2 { font-weight: 600; font-size: 1.8rem; letter-spacing: -0.025em; margin-bottom: 1.75rem; color: var(--sand); }
 
-  .code-block { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; padding: 1.5rem; border-radius: 10px; overflow-x: auto; line-height: 1.85; }
+  .section > p { max-width: 1160px; }
+  .code-block { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; padding: 1.5rem; border-radius: 10px; overflow-x: auto; line-height: 1.85; display: block; width: 100%; }
   .code-block .comment { color: var(--text3); }
   .code-block .url { color: var(--cyan); }
   .code-block .key { color: #F0A070; }
@@ -203,13 +204,13 @@
   </div>
 </div>
 
-<div class="ticker-wrap"><div class="ticker-track" id="highlight-bar"><span class="ticker-item">⬡ Loading network data...</span></div></div>
+<div class="ticker-wrap"><div class="ticker-track" id="highlight-bar"><span class="ticker-item">&#x27E1; Loading network data...</span></div></div>
 
 <!-- 01 QUICK START -->
 <div class="section" id="quickstart">
   <div class="section-label">01 — Quick Start</div>
   <h2>Start querying in seconds</h2>
-  <p style="color:var(--text2);margin-bottom:1.5rem;max-width:600px;line-height:1.75;">No authentication required. All endpoints return JSON. CORS enabled for browser requests.</p>
+  <p style="color:var(--text2);margin-bottom:1.5rem;line-height:1.75;">No authentication required. All endpoints return JSON. CORS enabled for browser requests.</p>
   <div class="code-block"><span class="comment"># Active hosts with reputation and available slots</span>
 curl "<span class="url">https://api.onledger.net/hosts?active=true&minRep=200&minSlots=1&limit=10</span>"
 
@@ -246,7 +247,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
     </div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
       <span id="endpoints-toggle-label">Expand</span>
-      <span id="endpoints-toggle-icon">▼</span>
+      <span id="endpoints-toggle-icon">&#9660;</span>
     </div>
   </div>
   <div id="endpoints-body" style="display:none;margin-top:1.5rem;">
@@ -257,7 +258,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <span class="method get">GET</span><span class="endpoint-path">/hosts</span><span class="endpoint-desc">Filtered host list</span>
       </div>
       <div class="endpoint-body">
-        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a paginated list of hosts matching the specified filters. All parameters optional. Defaults: minXah=5, minEvr=5.</p>
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a paginated list of hosts matching the specified filters. All parameters optional. Defaults: minXah=5, minEvr=5. Responses include <code style="color:var(--cyan);">total</code>, <code style="color:var(--cyan);">hasMore</code>, <code style="color:var(--cyan);">nextOffset</code> and <code style="color:var(--cyan);">prevOffset</code> pagination fields.</p>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
           <tr><td>active</td><td>boolean</td><td>—</td><td>Filter by active status</td></tr>
@@ -271,9 +272,15 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
           <tr><td>domain</td><td>string</td><td>—</td><td>Partial domain match</td></tr>
           <tr><td>version</td><td>string</td><td>—</td><td>Sashimono version (1.0.0, 0.12.1...)</td></tr>
           <tr><td>minRam / minDisk</td><td>integer</td><td>—</td><td>Minimum RAM (MB) or disk (MB)</td></tr>
-          <tr><td>isATransferer</td><td>integer</td><td>—</td><td>0 to exclude hosts in transfer mode, 1 to show only transferring hosts</td></tr>
-          <tr><td>reputedOnHeartbeat</td><td>boolean</td><td>—</td><td>true to return only hosts actively being reputation-tested</td></tr>
-          <tr><td>minAccumulatedReward</td><td>number</td><td>—</td><td>Minimum lifetime EVR rewards earned — filters to established long-running hosts</td></tr>
+          <tr><td>isATransferer</td><td>integer</td><td>—</td><td>0=exclude hosts in transfer mode, 1=only transferring hosts</td></tr>
+          <tr><td>reputedOnHeartbeat</td><td>boolean</td><td>—</td><td>true=only hosts actively being reputation-tested</td></tr>
+          <tr><td>minAccumulatedReward</td><td>number</td><td>—</td><td>Minimum lifetime EVR rewards earned</td></tr>
+          <tr><td>hasDescription</td><td>boolean</td><td>—</td><td>true=only hosts with a description set, false=only hosts without</td></tr>
+          <tr><td>hasEmail</td><td>boolean</td><td>—</td><td>true=only hosts with an email set, false=only hosts without</td></tr>
+          <tr><td>hasDomain</td><td>boolean</td><td>—</td><td>true=only hosts with a domain set, false=only hosts without</td></tr>
+          <tr><td>description_like</td><td>string</td><td>—</td><td>Partial match on description field</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated list of fields to return e.g. address,domain,hostReputation</td></tr>
+          <tr><td>sort</td><td>string</td><td>—</td><td>Shorthand sort e.g. sort=hostReputation:desc (alternative to sortBy + sortDir)</td></tr>
           <tr><td>sortBy</td><td>string</td><td>hostReputation</td><td>hostReputation, availableInstances, leaseDrops, xahBalance, evrBalance, ramMb, diskMb, lastHeartbeatIndex, registrationTimestamp, accumulatedReward, lastUpdated</td></tr>
           <tr><td>sortDir</td><td>string</td><td>desc</td><td>asc or desc</td></tr>
           <tr><td>limit / offset</td><td>integer</td><td>100 / 0</td><td>Pagination</td></tr>
@@ -286,11 +293,14 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <span class="method get">GET</span><span class="endpoint-path">/hosts/search</span><span class="endpoint-desc">Full text search</span>
       </div>
       <div class="endpoint-body">
-        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Search across domain, email and description fields. Returns hosts sorted by reputation.</p>
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Search across domain, email and description fields. Returns hosts sorted by reputation. At least one of q, hasDescription or description_like is required.</p>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
-          <tr><td>q</td><td>string</td><td>—</td><td>Search term (min 2 chars) — matches domain, email, description</td></tr>
+          <tr><td>q</td><td>string</td><td>—</td><td>Search term (min 2 chars) — matches domain, email and description. Optional if hasDescription or description_like provided.</td></tr>
+          <tr><td>hasDescription</td><td>boolean</td><td>—</td><td>true=only hosts with a description set</td></tr>
+          <tr><td>description_like</td><td>string</td><td>—</td><td>Partial match on description only</td></tr>
           <tr><td>active</td><td>boolean</td><td>—</td><td>Filter by active status</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
           <tr><td>limit</td><td>integer</td><td>50</td><td>Max results (up to 200)</td></tr>
         </table>
       </div>
@@ -305,6 +315,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
           <tr><td>hours</td><td>integer</td><td>24</td><td>Silence threshold in hours</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
           <tr><td>limit</td><td>integer</td><td>50</td><td>Max results (up to 200)</td></tr>
         </table>
       </div>
@@ -319,6 +330,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
           <tr><td>addresses</td><td>string</td><td>—</td><td>Comma-separated XRPL addresses (max 20)</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
         </table>
       </div>
     </div>
@@ -332,6 +344,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
           <tr><td>metric</td><td>string</td><td>hostReputation</td><td>hostReputation, accumulatedReward, xahBalance, evrBalance, ramMb, diskMb, availableInstances</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
           <tr><td>limit</td><td>integer</td><td>20</td><td>Number of results (max 100)</td></tr>
         </table>
       </div>
@@ -342,8 +355,8 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <span class="method post">POST</span><span class="endpoint-path">/hosts/batch</span><span class="endpoint-desc">Bulk address lookup</span>
       </div>
       <div class="endpoint-body">
-        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Fetch data for up to 100 hosts in a single POST. Body must be JSON with an <code style="color:var(--cyan);">addresses</code> array.</p>
-        <div class="code-block" style="margin-top:0.5rem;">{ <span class="key">"addresses"</span>: [<span class="val">"rXXX..."</span>, <span class="val">"rYYY..."</span>, <span class="val">"rZZZ..."</span>] }</div>
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Fetch data for up to 100 hosts in a single POST. Body must be JSON with an <code style="color:var(--cyan);">addresses</code> array. Optionally include a <code style="color:var(--cyan);">fields</code> array to limit returned fields.</p>
+        <div class="code-block" style="margin-top:0.5rem;">{ <span class="key">"addresses"</span>: [<span class="val">"rXXX..."</span>, <span class="val">"rYYY..."</span>], <span class="key">"fields"</span>: [<span class="val">"address"</span>, <span class="val">"domain"</span>, <span class="val">"hostReputation"</span>] }</div>
       </div>
     </div>
 
@@ -351,7 +364,13 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
       <div class="endpoint-header" onclick="toggle(this)">
         <span class="method get">GET</span><span class="endpoint-path">/hosts/:address</span><span class="endpoint-desc">Single host full data</span>
       </div>
-      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns complete data for a single host by XRPL address. All fields including hardware specs, reputation, balances and registration details.</p></div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns complete data for a single host by XRPL address.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
+        </table>
+      </div>
     </div>
 
     <div class="endpoint">
@@ -359,10 +378,11 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
         <span class="method get">GET</span><span class="endpoint-path">/hosts/:address/history</span><span class="endpoint-desc">Heartbeat history</span>
       </div>
       <div class="endpoint-body">
-        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a time-series of heartbeat snapshots capturing reputation, slots, balances and lease price over time. History accumulates from API v1.2.0 onwards.</p>
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a time-series of heartbeat snapshots capturing reputation, slots, balances and lease price over time. History accumulates from API v1.2.0 onwards. Supports pagination.</p>
         <table class="params-table">
           <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
           <tr><td>limit</td><td>integer</td><td>100</td><td>Number of snapshots to return (max 500)</td></tr>
+          <tr><td>offset</td><td>integer</td><td>0</td><td>Pagination offset</td></tr>
         </table>
       </div>
     </div>
@@ -380,6 +400,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
           <tr><td>minSlots</td><td>integer</td><td>—</td><td>Minimum available slots</td></tr>
           <tr><td>country</td><td>string</td><td>—</td><td>Filter by country code</td></tr>
           <tr><td>active</td><td>boolean</td><td>true</td><td>Filter by active status</td></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
         </table>
       </div>
     </div>
@@ -402,7 +423,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
       <div class="endpoint-header" onclick="toggle(this)">
         <span class="method get">GET</span><span class="endpoint-path">/stats</span><span class="endpoint-desc">Network summary statistics</span>
       </div>
-      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Network-wide statistics: total and active host counts, available slots, average reputation and balances, top countries and version distribution.</p></div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Network-wide statistics: total and active host counts, available slots, average reputation and balances, top countries, version distribution and count of hosts with descriptions.</p></div>
     </div>
 
     <div class="endpoint">
@@ -425,11 +446,11 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
     </div>
     <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
       <span id="examples-toggle-label">Expand</span>
-      <span id="examples-toggle-icon">▼</span>
+      <span id="examples-toggle-icon">&#9660;</span>
     </div>
   </div>
   <div id="examples-body" style="display:none;margin-top:1.5rem;">
-  <p style="color:var(--text2);margin-bottom:2.5rem;margin-top:1.5rem;max-width:600px;line-height:1.75;">Common queries shown in curl, browser fetch, and Node.js. All examples target <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">https://api.onledger.net</code>.</p>
+  <p style="color:var(--text2);margin-bottom:2.5rem;margin-top:1.5rem;line-height:1.75;">Common queries shown in curl, browser fetch, and Node.js. All examples target <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">https://api.onledger.net</code></p>
   <div class="examples-grid">
 
     <!-- 1 -->
@@ -446,8 +467,7 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
 <span class="key">const</span> { hosts, total } = <span class="key">await</span> res.json();
 console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> matching hosts`</span>);
 hosts.forEach(h => console.log(h.address, h.availableInstances));</div>
-      <div id="ex1-node" class="code-block ex-code" style="display:none"><span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minSlots=1&limit=20'</span>);
-<span class="key">const</span> { hosts } = <span class="key">await</span> res.json();
+      <div id="ex1-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minSlots=1&limit=20'</span>).then(r => r.json());
 console.log(hosts.map(h => h.address));</div>
     </div>
 
@@ -462,12 +482,10 @@ console.log(hosts.map(h => h.address));</div>
       </div>
       <div id="ex2-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV</span>"</div>
       <div id="ex2-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
-<span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>);
-<span class="key">const</span> { host } = <span class="key">await</span> res.json();
+<span class="key">const</span> { host } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>).then(r => r.json());
 console.log(host.domain, host.hostReputation, host.availableInstances);</div>
       <div id="ex2-node" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
-<span class="key">const</span> { host } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>)
-  .then(r => r.json());
+<span class="key">const</span> { host } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>).then(r => r.json());
 console.log(host);</div>
     </div>
 
@@ -481,14 +499,10 @@ console.log(host);</div>
         <button class="lang-tab" onclick="switchTab(this,'ex3','node')">Node.js</button>
       </div>
       <div id="ex3-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts?active=true&minRep=240&limit=50</span>"</div>
-      <div id="ex3-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRep=240&limit=50'</span>);
-<span class="key">const</span> { hosts } = <span class="key">await</span> res.json();
-<span class="comment">// shuffle for random selection</span>
+      <div id="ex3-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRep=240&limit=50'</span>).then(r => r.json());
 hosts.sort(() => Math.random() - 0.5);
-<span class="key">const</span> picked = hosts.slice(<span class="val">0</span>, <span class="val">10</span>);
-console.log(picked.map(h => h.address));</div>
+console.log(hosts.slice(<span class="val">0</span>, <span class="val">10</span>).map(h => h.address));</div>
       <div id="ex3-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRep=240&limit=500'</span>).then(r => r.json());
-<span class="comment">// Fisher-Yates shuffle</span>
 <span class="key">for</span> (<span class="key">let</span> i = hosts.length - <span class="val">1</span>; i > <span class="val">0</span>; i--) {
   <span class="key">const</span> j = Math.floor(Math.random() * (i + <span class="val">1</span>));
   [hosts[i], hosts[j]] = [hosts[j], hosts[i]];
@@ -506,13 +520,10 @@ console.log(hosts.slice(<span class="val">0</span>, <span class="val">10</span>)
         <button class="lang-tab" onclick="switchTab(this,'ex4','node')">Node.js</button>
       </div>
       <div id="ex4-curl" class="code-block ex-code"><span class="comment"># New Zealand hosts, cheapest first</span>
-curl "<span class="url">https://api.onledger.net/hosts?active=true&country=NZ&sortBy=leaseDrops&sortDir=asc</span>"</div>
-      <div id="ex4-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> params = <span class="key">new</span> URLSearchParams({ active: <span class="val">'true'</span>, country: <span class="val">'NZ'</span>, sortBy: <span class="val">'leaseDrops'</span>, sortDir: <span class="val">'asc'</span> });
-<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts?</span><span class="key">${params}</span><span class="val">`</span>).then(r => r.json());
+curl "<span class="url">https://api.onledger.net/hosts?active=true&country=NZ&sort=leaseDrops:asc</span>"</div>
+      <div id="ex4-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&country=NZ&sort=leaseDrops:asc'</span>).then(r => r.json());
 console.log(hosts);</div>
-      <div id="ex4-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
-  <span class="val">'https://api.onledger.net/hosts?active=true&country=NZ&sortBy=leaseDrops&sortDir=asc'</span>
-).then(r => r.json());
+      <div id="ex4-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&country=NZ&sort=leaseDrops:asc'</span>).then(r => r.json());
 console.log(<span class="val">`Found </span><span class="key">${hosts.length}</span><span class="val"> NZ hosts`</span>);</div>
     </div>
 
@@ -526,14 +537,10 @@ console.log(<span class="val">`Found </span><span class="key">${hosts.length}</s
         <button class="lang-tab" onclick="switchTab(this,'ex5','node')">Node.js</button>
       </div>
       <div id="ex5-curl" class="code-block ex-code"><span class="comment"># At least 4GB RAM, 20GB disk, 1 free slot</span>
-curl "<span class="url">https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sortBy=ramMb&sortDir=desc</span>"</div>
-      <div id="ex5-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(
-  <span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1'</span>
-).then(r => r.json());
+curl "<span class="url">https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sort=ramMb:desc</span>"</div>
+      <div id="ex5-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1'</span>).then(r => r.json());
 console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> hosts meet requirements`</span>);</div>
-      <div id="ex5-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
-  <span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sortBy=ramMb&sortDir=desc&limit=50'</span>
-).then(r => r.json());
+      <div id="ex5-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sort=ramMb:desc&limit=50'</span>).then(r => r.json());
 console.log(hosts.map(h => ({ address: h.address, ram: h.ramMb, disk: h.diskMb })));</div>
     </div>
 
@@ -578,34 +585,38 @@ console.log(<span class="val">`Found </span><span class="key">${found}</span><sp
 <span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/compare?addresses=</span><span class="key">${addresses}</span><span class="val">`</span>).then(r => r.json());
 hosts.forEach(h => console.log(h.address, h.hostReputation, h.availableInstances));</div>
       <div id="ex7-node" class="code-block ex-code" style="display:none"><span class="key">const</span> addresses = [<span class="val">'rXXX'</span>, <span class="val">'rYYY'</span>, <span class="val">'rZZZ'</span>];
-<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
-  <span class="val">`https://api.onledger.net/hosts/compare?addresses=</span><span class="key">${addresses.join(',')}</span><span class="val">`</span>
-).then(r => r.json());
+<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/compare?addresses=</span><span class="key">${addresses.join(',')}</span><span class="val">`</span>).then(r => r.json());
 console.log(hosts);</div>
     </div>
 
     <!-- 8 -->
     <div class="example-block">
       <div class="example-title">Search by domain, email or description</div>
-      <div class="example-desc">Full text search across operator-provided fields — useful for finding a specific host operator by name.</div>
+      <div class="example-desc">Full text search across operator-provided fields. Use description_like for description-only matching, or hasDescription to find all hosts that have filled one in.</div>
       <div class="lang-tabs">
         <button class="lang-tab active" onclick="switchTab(this,'ex8','curl')">curl</button>
         <button class="lang-tab" onclick="switchTab(this,'ex8','fetch')">fetch</button>
         <button class="lang-tab" onclick="switchTab(this,'ex8','node')">Node.js</button>
       </div>
-      <div id="ex8-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/search?q=onledger&active=true</span>"</div>
+      <div id="ex8-curl" class="code-block ex-code"><span class="comment"># Broad search across all text fields</span>
+curl "<span class="url">https://api.onledger.net/hosts/search?q=onledger&active=true</span>"
+
+<span class="comment"># Only hosts with descriptions containing "Frankfurt"</span>
+curl "<span class="url">https://api.onledger.net/hosts/search?description_like=Frankfurt&active=true</span>"
+
+<span class="comment"># All active hosts that have set a description</span>
+curl "<span class="url">https://api.onledger.net/hosts/search?hasDescription=true&active=true</span>"</div>
       <div id="ex8-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts/search?q=onledger&active=true'</span>).then(r => r.json());
 console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> results`</span>, hosts);</div>
-      <div id="ex8-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
-  <span class="val">'https://api.onledger.net/hosts/search?q=onledger&active=true'</span>
-).then(r => r.json());
-console.log(hosts);</div>
+      <div id="ex8-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts/search?hasDescription=true&active=true&limit=200'</span>).then(r => r.json());
+console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> hosts have descriptions`</span>);
+console.log(hosts.map(h => ({ address: h.address, description: h.description })));</div>
     </div>
 
     <!-- 9 -->
     <div class="example-block">
       <div class="example-title">Paginate through all hosts</div>
-      <div class="example-desc">Use limit and offset to page through the full host list in batches.</div>
+      <div class="example-desc">Use the hasMore and nextOffset fields in the response to page through results efficiently.</div>
       <div class="lang-tabs">
         <button class="lang-tab active" onclick="switchTab(this,'ex9','curl')">curl</button>
         <button class="lang-tab" onclick="switchTab(this,'ex9','fetch')">fetch</button>
@@ -613,31 +624,29 @@ console.log(hosts);</div>
       </div>
       <div id="ex9-curl" class="code-block ex-code"><span class="comment"># Page 1</span>
 curl "<span class="url">https://api.onledger.net/hosts?active=true&limit=100&offset=0</span>"
-<span class="comment"># Page 2</span>
+<span class="comment"># Use nextOffset from response for page 2</span>
 curl "<span class="url">https://api.onledger.net/hosts?active=true&limit=100&offset=100</span>"</div>
       <div id="ex9-fetch" class="code-block ex-code" style="display:none"><span class="key">async function</span> getAllHosts() {
-  <span class="key">const</span> pageSize = <span class="val">100</span>;
-  <span class="key">let</span> offset = <span class="val">0</span>, all = [];
-  <span class="key">while</span> (<span class="val">true</span>) {
-    <span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
-      <span class="val">`https://api.onledger.net/hosts?active=true&limit=</span><span class="key">${pageSize}</span><span class="val">&offset=</span><span class="key">${offset}</span><span class="val">`</span>
+  <span class="key">let</span> offset = <span class="val">0</span>, all = [], hasMore = <span class="val">true</span>;
+  <span class="key">while</span> (hasMore) {
+    <span class="key">const</span> data = <span class="key">await</span> fetch(
+      <span class="val">`https://api.onledger.net/hosts?active=true&limit=100&offset=</span><span class="key">${offset}</span><span class="val">`</span>
     ).then(r => r.json());
-    <span class="key">if</span> (!hosts.length) <span class="key">break</span>;
-    all = all.concat(hosts);
-    offset += pageSize;
+    all = all.concat(data.hosts);
+    hasMore = data.hasMore;
+    offset  = data.nextOffset;
   }
   <span class="key">return</span> all;
 }</div>
       <div id="ex9-node" class="code-block ex-code" style="display:none"><span class="key">async function</span> getAllHosts() {
-  <span class="key">const</span> pageSize = <span class="val">100</span>;
-  <span class="key">let</span> offset = <span class="val">0</span>, all = [], done = <span class="val">false</span>;
-  <span class="key">while</span> (!done) {
-    <span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(
-      <span class="val">`https://api.onledger.net/hosts?active=true&limit=</span><span class="key">${pageSize}</span><span class="val">&offset=</span><span class="key">${offset}</span><span class="val">`</span>
+  <span class="key">let</span> offset = <span class="val">0</span>, all = [], hasMore = <span class="val">true</span>;
+  <span class="key">while</span> (hasMore) {
+    <span class="key">const</span> { hosts, hasMore: more, nextOffset } = <span class="key">await</span> fetch(
+      <span class="val">`https://api.onledger.net/hosts?active=true&limit=100&offset=</span><span class="key">${offset}</span><span class="val">`</span>
     ).then(r => r.json());
     all = all.concat(hosts);
-    offset += pageSize;
-    done = all.length >= total;
+    hasMore = more;
+    offset  = nextOffset;
   }
   console.log(<span class="val">`Fetched </span><span class="key">${all.length}</span><span class="val"> hosts`</span>);
   <span class="key">return</span> all;
@@ -656,9 +665,7 @@ getAllHosts();</div>
       </div>
       <div id="ex10-curl" class="code-block ex-code"><span class="comment"># Top 10 by accumulated EVR rewards</span>
 curl "<span class="url">https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10</span>"</div>
-      <div id="ex10-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, label } = <span class="key">await</span> fetch(
-  <span class="val">'https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10'</span>
-).then(r => r.json());
+      <div id="ex10-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, label } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10'</span>).then(r => r.json());
 console.log(label, hosts.map(h => ({ address: h.address, reward: h.accumulatedReward })));</div>
       <div id="ex10-node" class="code-block ex-code" style="display:none"><span class="key">const</span> metrics = [<span class="val">'hostReputation'</span>, <span class="val">'accumulatedReward'</span>, <span class="val">'ramMb'</span>];
 <span class="key">const</span> results = <span class="key">await</span> Promise.all(
@@ -681,9 +688,7 @@ results.forEach(r => console.log(r.label, r.hosts.map(h => h.address)));</div>
 <span class="key">const</span> { history } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">/history?limit=50`</span>).then(r => r.json());
 history.forEach(h => console.log(new Date(h.timestamp).toISOString(), h.hostReputation));</div>
       <div id="ex11-node" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
-<span class="key">const</span> { history, domain } = <span class="key">await</span> fetch(
-  <span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">/history`</span>
-).then(r => r.json());
+<span class="key">const</span> { history, domain } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">/history`</span>).then(r => r.json());
 console.log(<span class="val">`</span><span class="key">${domain}</span><span class="val">: </span><span class="key">${history.length}</span><span class="val"> snapshots`</span>);
 console.log(history);</div>
     </div>
@@ -696,7 +701,7 @@ console.log(history);</div>
 <div class="section" id="builder">
   <div class="section-label">04 — Try It</div>
   <h2>Live query builder</h2>
-  <p style="color:var(--text2);margin-bottom:2rem;max-width:500px;line-height:1.75;">Build a query and see the live response directly from the API.</p>
+  <p style="color:var(--text2);margin-bottom:2rem;line-height:1.75;">Build a query and see the live response directly from the API. For advanced filtering see the full endpoint reference above.</p>
   <div class="builder">
     <div class="builder-form">
       <div class="form-row">
@@ -747,23 +752,18 @@ console.log(history);</div>
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:5px;">Exclude transferring hosts
-            <span class="info-tip" data-tip="Hosts in transfer mode may not reliably accept new contracts. Enabling this filter (isATransferer=0) excludes them.">?</span>
+          <label style="display:flex;align-items:center;gap:5px;">Has Description
+            <span class="info-tip" data-tip="Filter to hosts that have provided a description of their service. Only about 26% of active hosts have filled this in.">?</span>
           </label>
-          <select id="q-transferer">
-            <option value="">Include all</option>
-            <option value="0">Exclude transferring</option>
-            <option value="1">Only transferring</option>
+          <select id="q-hasDescription">
+            <option value="">Any</option>
+            <option value="true">Yes — has description</option>
+            <option value="false">No — no description</option>
           </select>
         </div>
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:5px;">Reputation tested only
-            <span class="info-tip" data-tip="Only return hosts actively being tested by the reputation contract on each heartbeat.">?</span>
-          </label>
-          <select id="q-reputed">
-            <option value="">Any</option>
-            <option value="true">Yes</option>
-          </select>
+          <label>Description contains</label>
+          <input type="text" id="q-descriptionLike" placeholder="e.g. Frankfurt">
         </div>
       </div>
       <div class="form-row">
@@ -803,8 +803,9 @@ console.log(history);</div>
         <span>Response</span>
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <span class="result-count" id="result-count"></span>
-          <button class="dl-btn" id="dl-json" onclick="downloadJSON()" style="display:none">↓ JSON</button>
-          <button class="dl-btn" id="dl-csv" onclick="downloadCSV()" style="display:none">↓ CSV</button>
+          <button class="dl-btn" id="dl-next" onclick="loadNextPage()" style="display:none">&#8594; Next page</button>
+          <button class="dl-btn" id="dl-json" onclick="downloadJSON()" style="display:none">&#8595; JSON</button>
+          <button class="dl-btn" id="dl-csv" onclick="downloadCSV()" style="display:none">&#8595; CSV</button>
         </div>
       </div>
       <div class="result-body" id="result-body">Click "Run query" to see live results...</div>
@@ -816,7 +817,7 @@ console.log(history);</div>
 <div class="section">
   <div class="section-label">05 — Data Fields</div>
   <h2>Host object</h2>
-  <p style="color:var(--text2);margin-bottom:1.5rem;max-width:600px;line-height:1.75;">Every host object returned by the API contains the following fields.</p>
+  <p style="color:var(--text2);margin-bottom:1.5rem;line-height:1.75;">Every host object returned by the API contains the following fields. Use the <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">fields</code> parameter on any endpoint to limit which fields are returned.</p>
   <div class="code-block" style="line-height:1.95">{
   <span class="key">"address"</span>:               <span class="val">"rXXX..."</span>          <span class="comment">// XRPL address</span>
   <span class="key">"active"</span>:                <span class="val">1</span>                  <span class="comment">// 1=active, 0=inactive</span>
@@ -852,6 +853,17 @@ console.log(history);</div>
   <span class="key">"lastVoteTimestamp"</span>:     <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last governance vote (may be null)</span>
   <span class="key">"lastHeartbeatIndex"</span>:    <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last heartbeat</span>
   <span class="key">"lastUpdated"</span>:           <span class="val">1775701701966</span>      <span class="comment">// last DB update (ms)</span>
+}
+
+<span class="comment">// List responses also include pagination metadata:</span>
+{
+  <span class="key">"total"</span>:      <span class="val">2789</span>   <span class="comment">// total matching records</span>
+  <span class="key">"limit"</span>:      <span class="val">5</span>      <span class="comment">// page size used</span>
+  <span class="key">"offset"</span>:     <span class="val">0</span>      <span class="comment">// current offset</span>
+  <span class="key">"hasMore"</span>:    <span class="val">true</span>   <span class="comment">// more results available</span>
+  <span class="key">"nextOffset"</span>: <span class="val">5</span>      <span class="comment">// pass as offset for next page (null if last page)</span>
+  <span class="key">"prevOffset"</span>: <span class="val">null</span>   <span class="comment">// pass as offset for previous page (null if first page)</span>
+  <span class="key">"hosts"</span>:      [...]  <span class="comment">// array of host objects</span>
 }</div>
 </div>
 
@@ -889,10 +901,10 @@ console.log(history);</div>
         ...countries.slice(0,4).map(c => `<strong>${c.countryCode}</strong> ${c.count} hosts`),
         ...versions.map(v => `v${v.version} — <strong>${v.count}</strong> hosts`)
       ];
-      const html = items.map(t => `<span class="ticker-item">⬡ ${t}</span>`).join('');
+      const html = items.map(t => `<span class="ticker-item">&#x27E1; ${t}</span>`).join('');
       bar.innerHTML = html + html;
     } catch(e) {
-      document.getElementById('highlight-bar').innerHTML = '<span class="ticker-item">⬡ Connecting to API...</span>';
+      document.getElementById('highlight-bar').innerHTML = '<span class="ticker-item">&#x27E1; Connecting to API...</span>';
     }
   }
 
@@ -944,7 +956,7 @@ console.log(history);</div>
     const collapsed = body.style.display === 'none';
     body.style.display = collapsed ? 'block' : 'none';
     label.textContent = collapsed ? 'Collapse' : 'Expand';
-    icon.textContent = collapsed ? '▲' : '▼';
+    icon.innerHTML = collapsed ? '&#9650;' : '&#9660;';
   }
 
   function toggle(header) { header.nextElementSibling.classList.toggle('open'); }
@@ -972,8 +984,9 @@ console.log(history);</div>
   }
 
   let _lastData = null;
+  let _lastOffset = 0;
 
-  async function runQuery() {
+  async function runQuery(overrideOffset) {
     const params = new URLSearchParams({ active: 'true' });
     const fields = {
       'q-minRep':'minRep','q-minSlots':'minSlots','q-minXah':'minXah','q-minEvr':'minEvr',
@@ -985,27 +998,38 @@ console.log(history);</div>
     if (country) params.set('country', country);
     const domain = document.getElementById('q-domain').value.trim();
     if (domain) params.set('domain', domain);
-    const transferer = document.getElementById('q-transferer').value;
-    if (transferer !== '') params.set('isATransferer', transferer);
-    const reputed = document.getElementById('q-reputed').value;
-    if (reputed) params.set('reputedOnHeartbeat', reputed);
+    const hasDescription = document.getElementById('q-hasDescription').value;
+    if (hasDescription) params.set('hasDescription', hasDescription);
+    const descriptionLike = document.getElementById('q-descriptionLike').value.trim();
+    if (descriptionLike) params.set('description_like', descriptionLike);
+    if (overrideOffset !== undefined) params.set('offset', overrideOffset);
 
-    const body = document.getElementById('result-body');
+    const body  = document.getElementById('result-body');
     const count = document.getElementById('result-count');
-    body.innerHTML = 'Loading...'; count.textContent = '';
+    body.innerHTML = 'Loading...';
+    count.textContent = '';
     document.getElementById('dl-json').style.display = 'none';
-    document.getElementById('dl-csv').style.display = 'none';
+    document.getElementById('dl-csv').style.display  = 'none';
+    document.getElementById('dl-next').style.display = 'none';
+
     try {
       const data = await fetch(API + '/hosts?' + params.toString()).then(r => r.json());
-      _lastData = convertTimestamps(data.hosts || []);
-      count.textContent = data.total + ' matching';
-      const display = { ...data, hosts: _lastData };
-      body.innerHTML = highlight(JSON.stringify(display, null, 2));
+      _lastData   = convertTimestamps(data.hosts || []);
+      _lastOffset = data.nextOffset;
+      count.textContent = `${_lastData.length} of ${data.total} matching`;
+      body.innerHTML = highlight(JSON.stringify({ ...data, hosts: _lastData }, null, 2));
       if (_lastData.length) {
         document.getElementById('dl-json').style.display = 'inline-block';
-        document.getElementById('dl-csv').style.display = 'inline-block';
+        document.getElementById('dl-csv').style.display  = 'inline-block';
+      }
+      if (data.hasMore && data.nextOffset !== null) {
+        document.getElementById('dl-next').style.display = 'inline-block';
       }
     } catch(e) { body.innerHTML = 'Error: ' + e.message; }
+  }
+
+  function loadNextPage() {
+    if (_lastOffset !== null && _lastOffset !== undefined) runQuery(_lastOffset);
   }
 
   function downloadJSON() {
