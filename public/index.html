@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evernode Host API — Live Network Data</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:           #0D1B2A;
+    --bg2:          #111F30;
+    --bg3:          #172638;
+    --bg4:          #1E2F42;
+    --border:       #253648;
+    --border2:      #2E4057;
+    --text:         #F4F1E8;
+    --text2:        #9AAFC2;
+    --text3:        #5A7A96;
+    --accent:       #1B6CA8;
+    --accent2:      #48CAE4;
+    --accent-bg:    rgba(72,202,228,0.10);
+    --accent-border:rgba(72,202,228,0.28);
+    --cyan:         #48CAE4;
+    --blue-light:   #3B8EC4;
+    --slate:        #2E4057;
+    --sand:         #F4F1E8;
+    --green:        #4FC3A1;
+    --green-bg:     rgba(79,195,161,0.10);
+    --amber:        #E8B84B;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; overflow-x: hidden; }
+
+  nav { position: sticky; top: 0; z-index: 100; background: rgba(13,27,42,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; }
+  .nav-logo { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.75rem; color: var(--text); text-decoration: none; }
+  .nav-logo-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-bg); border: 1px solid var(--accent-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .nav-badge { background: var(--green-bg); color: var(--green); border: 1px solid rgba(79,195,161,0.25); padding: 2px 9px; font-size: 0.68rem; font-weight: 500; border-radius: 20px; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 5px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .nav-links { display: flex; gap: 0.15rem; list-style: none; }
+  .nav-links a { font-size: 0.82rem; color: var(--text2); text-decoration: none; padding: 0.4rem 0.85rem; border-radius: 6px; transition: all 0.15s; }
+  .nav-links a:hover { color: var(--text); background: var(--bg3); }
+  .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+  .gh-link { font-size: 0.8rem; color: var(--text2); text-decoration: none; padding: 0.4rem 1rem; border: 1px solid var(--border2); border-radius: 6px; transition: all 0.15s; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .gh-link:hover { color: var(--text); background: var(--bg3); }
+
+  .hero-wrap { border-bottom: 1px solid var(--border); overflow: hidden; position: relative; }
+  .hero-glow { position: absolute; top: -120px; right: -80px; width: 560px; height: 440px; border-radius: 50%; background: radial-gradient(ellipse, rgba(72,202,228,0.06) 0%, transparent 68%); pointer-events: none; }
+  .hero { max-width: 1160px; margin: 0 auto; padding: 6rem 2rem 5rem; display: grid; grid-template-columns: 1fr 400px; gap: 5rem; align-items: center; }
+  .hero-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.04em; color: var(--accent2); background: var(--accent-bg); border: 1px solid var(--accent-border); padding: 4px 12px; border-radius: 20px; margin-bottom: 1.5rem; }
+  .hero h1 { font-size: clamp(2.2rem, 3.8vw, 3.3rem); font-weight: 600; line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 1.25rem; color: var(--sand); }
+  .hero h1 em { font-style: normal; color: var(--cyan); }
+  .hero p { color: var(--text2); font-size: 1rem; max-width: 460px; margin-bottom: 2rem; line-height: 1.75; }
+  .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+  .btn { font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; padding: 0.6rem 1.3rem; border-radius: 7px; text-decoration: none; cursor: pointer; transition: all 0.15s; border: none; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--blue-light); }
+  .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
+  .btn-secondary:hover { background: var(--bg4); }
+
+  .stats-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .stats-panel-header { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.25rem; display: flex; align-items: center; gap: 0.6rem; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+  .stat-item { padding: 1rem; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; }
+  .stat-value { font-weight: 600; font-size: 1.75rem; color: var(--sand); letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.3rem; }
+  .stat-value.cyan { color: var(--cyan); }
+  .stat-value.blue { color: var(--blue-light); }
+  .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+
+  .ticker-wrap { background: var(--slate); border-top: 1px solid var(--border2); border-bottom: 1px solid var(--border2); overflow: hidden; width: 100%; }
+  .ticker-track { display: inline-flex; white-space: nowrap; animation: ticker-scroll 40s linear infinite; }
+  .ticker-track:hover { animation-play-state: paused; }
+  @keyframes ticker-scroll { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  .ticker-item { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--text2); padding: 0.65rem 2rem; border-right: 1px solid var(--border); display: inline-block; }
+  .ticker-item strong { color: var(--cyan); font-weight: 500; }
+
+  .section { max-width: 1160px; margin: 0 auto; padding: 4rem 2rem; border-bottom: 1px solid var(--border); }
+  .section-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
+  .section h2 { font-weight: 600; font-size: 1.8rem; letter-spacing: -0.025em; margin-bottom: 1.75rem; color: var(--sand); }
+
+  .code-block { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; padding: 1.5rem; border-radius: 10px; overflow-x: auto; line-height: 1.85; }
+  .code-block .comment { color: var(--text3); }
+  .code-block .url { color: var(--cyan); }
+  .code-block .key { color: #F0A070; }
+  .code-block .val { color: var(--cyan); }
+
+  .endpoints { display: flex; flex-direction: column; gap: 1rem; }
+  .endpoint { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .endpoint:hover { border-color: var(--border2); }
+  .endpoint-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; cursor: pointer; background: var(--bg2); }
+  .method { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; font-weight: 500; padding: 3px 10px; border-radius: 4px; min-width: 46px; text-align: center; }
+  .method.get  { background: rgba(72,202,228,0.12); color: var(--cyan); border: 1px solid rgba(72,202,228,0.25); }
+  .method.post { background: rgba(232,184,75,0.12); color: var(--amber); border: 1px solid rgba(232,184,75,0.25); }
+  .endpoint-path { font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; font-weight: 500; color: var(--text); }
+  .endpoint-desc { font-size: 0.82rem; color: var(--text3); margin-left: auto; }
+  .endpoint-body { display: none; padding: 1.5rem; border-top: 1px solid var(--border); background: var(--bg); }
+  .endpoint-body.open { display: block; }
+  .params-table { width: 100%; border-collapse: collapse; }
+  .params-table th { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+  .params-table td { font-size: 0.83rem; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text2); }
+  .params-table td:first-child { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #F0A070; }
+
+  .builder { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start; }
+  .builder-form { display: flex; flex-direction: column; gap: 1rem; align-self: start; }
+  .builder-result { align-self: start; margin-top: 1.5rem; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .form-group label { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.07em; }
+  .form-group input, .form-group select { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; padding: 0.55rem 0.75rem; border: 1px solid var(--border2); border-radius: 6px; background: var(--bg3); color: var(--text); outline: none; transition: border-color 0.15s; }
+  .form-group input:focus, .form-group select:focus { border-color: var(--cyan); }
+  .form-group select option { background: var(--bg3); }
+  .builder-result { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; min-height: 300px; }
+  .result-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .result-header span { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; }
+  .result-count { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--cyan); }
+  .result-body { padding: 1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: var(--text2); overflow-y: auto; max-height: 420px; line-height: 1.75; white-space: pre-wrap; }
+  .result-body .json-key { color: #F0A070; }
+  .result-body .json-str { color: var(--cyan); }
+  .result-body .json-num { color: var(--blue-light); }
+  .result-body .json-bool { color: #B39DDB; }
+
+  footer { border-top: 1px solid var(--border); padding: 2rem; display: flex; justify-content: space-between; align-items: center; max-width: 1160px; margin: 0 auto; }
+  footer a { color: var(--text2); text-decoration: none; transition: color 0.15s; }
+  footer a:hover { color: var(--cyan); }
+
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; gap: 2.5rem; }
+    .builder { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .nav-links { display: none; }
+  }
+  .examples-grid { display: flex; flex-direction: column; gap: 1.5rem; }
+  .example-block { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .example-title { font-size: 0.95rem; font-weight: 600; color: var(--sand); padding: 1.1rem 1.25rem 0.25rem; }
+  .example-desc { font-size: 0.85rem; color: var(--text2); padding: 0 1.25rem 1rem; line-height: 1.65; }
+  .lang-tabs { display: flex; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); background: var(--bg2); }
+  .lang-tab { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; padding: 0.5rem 1.1rem; border: none; background: transparent; color: var(--text3); cursor: pointer; transition: all 0.15s; border-right: 1px solid var(--border); }
+  .lang-tab:hover { color: var(--text2); background: var(--bg3); }
+  .lang-tab.active { color: var(--cyan); background: var(--bg3); }
+  .ex-code { border-radius: 0; border-left: none; border-right: none; border-bottom: none; border-top: none; }
+  .dl-btn { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; font-weight: 500; padding: 3px 10px; border-radius: 4px; border: 1px solid var(--border2); background: var(--bg3); color: var(--cyan); cursor: pointer; transition: all 0.15s; }
+  .dl-btn:hover { background: var(--bg4); border-color: var(--cyan); }
+  .info-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--bg4); border:1px solid var(--border2); color:var(--text3); font-size:0.6rem; cursor:default; position:relative; font-family:'JetBrains Mono',monospace; font-style:normal; }
+  .info-tip::after { content:attr(data-tip); display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); width:220px; background:var(--bg4); border:1px solid var(--border2); color:var(--text2); font-size:0.72rem; line-height:1.5; padding:8px 10px; border-radius:6px; font-family:'Inter',sans-serif; font-weight:400; text-transform:none; letter-spacing:0; z-index:10; pointer-events:none; }
+  .info-tip:hover::after { display:block; }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-mark">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="8,2 14,5.5 14,10.5 8,14 2,10.5 2,5.5" fill="none" stroke="#48CAE4" stroke-width="1.5"/>
+        <circle cx="8" cy="8" r="2" fill="#48CAE4"/>
+      </svg>
+    </div>
+    Evernode Host API
+  </a>
+  <ul class="nav-links">
+    <li><a href="#quickstart">Quick Start</a></li>
+    <li><a href="#endpoints">Endpoints</a></li>
+    <li><a href="#examples">Examples</a></li>
+    <li><a href="#builder">Try It</a></li>
+  </ul>
+  <div class="nav-right">
+    <div class="nav-badge"><div class="live-dot"></div>Live</div>
+    <a class="gh-link" href="https://github.com/rippleitinnz/evernode-host-api" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+</nav>
+
+<div class="hero-wrap">
+  <div class="hero-glow"></div>
+  <div class="hero">
+    <div>
+      <div class="hero-eyebrow">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" stroke="#48CAE4" stroke-width="2" fill="none"/></svg>
+        Evernode Network Data
+      </div>
+      <h1>Real-time host<br>discovery <em>API</em></h1>
+      <p>Query 12,000+ Evernode hosts filtered by reputation, instances, balance, country and more. Updated in real-time via heartbeat subscriptions to the Xahau ledger.</p>
+      <div class="hero-cta">
+        <a href="#builder" class="btn btn-primary">Try the API</a>
+        <a href="#endpoints" class="btn btn-secondary">View endpoints</a>
+      </div>
+    </div>
+    <div class="stats-panel">
+      <div class="stats-panel-header"><div class="live-dot"></div>Live network stats</div>
+      <div class="stats-grid">
+        <div class="stat-item"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Registered hosts</div></div>
+        <div class="stat-item"><div class="stat-value cyan" id="stat-total-instances">—</div><div class="stat-label">Total instances</div></div>
+        <div class="stat-item"><div class="stat-value cyan" id="stat-active">—</div><div class="stat-label">Active hosts</div></div>
+        <div class="stat-item"><div class="stat-value blue" id="stat-avail-instances">—</div><div class="stat-label">Avail. instances</div></div>
+        <div class="stat-item"><div class="stat-value" id="stat-rep">—</div><div class="stat-label">Avg reputation</div></div>
+        <div class="stat-item"><div class="stat-value blue" id="stat-used-instances">—</div><div class="stat-label">Instances in use</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ticker-wrap"><div class="ticker-track" id="highlight-bar"><span class="ticker-item">⬡ Loading network data...</span></div></div>
+
+<!-- 01 QUICK START -->
+<div class="section" id="quickstart">
+  <div class="section-label">01 — Quick Start</div>
+  <h2>Start querying in seconds</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;max-width:600px;line-height:1.75;">No authentication required. All endpoints return JSON. CORS enabled for browser requests.</p>
+  <div class="code-block"><span class="comment"># Active hosts with reputation and available slots</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&minRep=200&minSlots=1&limit=10</span>"
+
+<span class="comment"># Single host by address</span>
+curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV</span>"
+
+<span class="comment"># Search by domain, email or description</span>
+curl "<span class="url">https://api.onledger.net/hosts/search?q=onledger</span>"
+
+<span class="comment"># Top hosts leaderboard</span>
+curl "<span class="url">https://api.onledger.net/leaderboard?metric=hostReputation&limit=10</span>"
+
+<span class="comment"># Compare multiple hosts</span>
+curl "<span class="url">https://api.onledger.net/hosts/compare?addresses=rXXX,rYYY,rZZZ</span>"
+
+<span class="comment"># Batch lookup (POST)</span>
+curl -X POST "<span class="url">https://api.onledger.net/hosts/batch</span>" \
+  -H "Content-Type: application/json" \
+  -d '{"addresses":["rXXX","rYYY"]}'
+
+<span class="comment"># Heartbeat history for a host</span>
+curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV/history</span>"
+
+<span class="comment"># Network statistics</span>
+curl "<span class="url">https://api.onledger.net/stats</span>"</div>
+</div>
+
+<!-- 02 ENDPOINTS -->
+<div class="section" id="endpoints">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('endpoints-body','endpoints-toggle-label','endpoints-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">02 — Endpoints</div>
+      <h2 style="margin-bottom:0;">API reference</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="endpoints-toggle-label">Expand</span>
+      <span id="endpoints-toggle-icon">▼</span>
+    </div>
+  </div>
+  <div id="endpoints-body" style="display:none;margin-top:1.5rem;">
+  <div class="endpoints">
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts</span><span class="endpoint-desc">Filtered host list</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a paginated list of hosts matching the specified filters. All parameters optional. Defaults: minXah=5, minEvr=5.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>active</td><td>boolean</td><td>—</td><td>Filter by active status</td></tr>
+          <tr><td>minSlots / maxSlots</td><td>integer</td><td>—</td><td>Available instances range</td></tr>
+          <tr><td>minRep / maxRep</td><td>integer</td><td>—</td><td>Reputation score range (0–255)</td></tr>
+          <tr><td>includeUnscored</td><td>boolean</td><td>false</td><td>Include hosts with rep=0</td></tr>
+          <tr><td>minXah</td><td>number</td><td>5</td><td>Minimum XAH balance</td></tr>
+          <tr><td>minEvr</td><td>number</td><td>5</td><td>Minimum EVR balance</td></tr>
+          <tr><td>minLease / maxLease</td><td>integer</td><td>—</td><td>Lease price range in drops</td></tr>
+          <tr><td>country</td><td>string</td><td>—</td><td>2-letter ISO country code (DE, FR, JP...)</td></tr>
+          <tr><td>domain</td><td>string</td><td>—</td><td>Partial domain match</td></tr>
+          <tr><td>version</td><td>string</td><td>—</td><td>Sashimono version (1.0.0, 0.12.1...)</td></tr>
+          <tr><td>minRam / minDisk</td><td>integer</td><td>—</td><td>Minimum RAM (MB) or disk (MB)</td></tr>
+          <tr><td>isATransferer</td><td>integer</td><td>—</td><td>0 to exclude hosts in transfer mode, 1 to show only transferring hosts</td></tr>
+          <tr><td>reputedOnHeartbeat</td><td>boolean</td><td>—</td><td>true to return only hosts actively being reputation-tested</td></tr>
+          <tr><td>minAccumulatedReward</td><td>number</td><td>—</td><td>Minimum lifetime EVR rewards earned — filters to established long-running hosts</td></tr>
+          <tr><td>sortBy</td><td>string</td><td>hostReputation</td><td>hostReputation, availableInstances, leaseDrops, xahBalance, evrBalance, ramMb, diskMb, lastHeartbeatIndex, registrationTimestamp, accumulatedReward, lastUpdated</td></tr>
+          <tr><td>sortDir</td><td>string</td><td>desc</td><td>asc or desc</td></tr>
+          <tr><td>limit / offset</td><td>integer</td><td>100 / 0</td><td>Pagination</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/search</span><span class="endpoint-desc">Full text search</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Search across domain, email and description fields. Returns hosts sorted by reputation.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>q</td><td>string</td><td>—</td><td>Search term (min 2 chars) — matches domain, email, description</td></tr>
+          <tr><td>active</td><td>boolean</td><td>—</td><td>Filter by active status</td></tr>
+          <tr><td>limit</td><td>integer</td><td>50</td><td>Max results (up to 200)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/expiring</span><span class="endpoint-desc">Silent / stale hosts</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns active hosts that have not sent a heartbeat within the specified number of hours.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>hours</td><td>integer</td><td>24</td><td>Silence threshold in hours</td></tr>
+          <tr><td>limit</td><td>integer</td><td>50</td><td>Max results (up to 200)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/compare</span><span class="endpoint-desc">Compare multiple hosts</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Fetch full data for multiple hosts in a single request, returned in the same order as requested. Max 20 addresses.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>addresses</td><td>string</td><td>—</td><td>Comma-separated XRPL addresses (max 20)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/leaderboard</span><span class="endpoint-desc">Top hosts by metric</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns the top N active hosts ranked by the specified metric.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>metric</td><td>string</td><td>hostReputation</td><td>hostReputation, accumulatedReward, xahBalance, evrBalance, ramMb, diskMb, availableInstances</td></tr>
+          <tr><td>limit</td><td>integer</td><td>20</td><td>Number of results (max 100)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method post">POST</span><span class="endpoint-path">/hosts/batch</span><span class="endpoint-desc">Bulk address lookup</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Fetch data for up to 100 hosts in a single POST. Body must be JSON with an <code style="color:var(--cyan);">addresses</code> array.</p>
+        <div class="code-block" style="margin-top:0.5rem;">{ <span class="key">"addresses"</span>: [<span class="val">"rXXX..."</span>, <span class="val">"rYYY..."</span>, <span class="val">"rZZZ..."</span>] }</div>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/:address</span><span class="endpoint-desc">Single host full data</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns complete data for a single host by XRPL address. All fields including hardware specs, reputation, balances and registration details.</p></div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/:address/history</span><span class="endpoint-desc">Heartbeat history</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a time-series of heartbeat snapshots capturing reputation, slots, balances and lease price over time. History accumulates from API v1.2.0 onwards.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>limit</td><td>integer</td><td>100</td><td>Number of snapshots to return (max 500)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/random</span><span class="endpoint-desc">Random host sample</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns a randomly selected set of hosts matching the given filters. Useful for load distribution without client-side shuffling.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>count</td><td>integer</td><td>10</td><td>Number of random hosts to return (max 200)</td></tr>
+          <tr><td>minRep</td><td>integer</td><td>—</td><td>Minimum reputation score</td></tr>
+          <tr><td>minSlots</td><td>integer</td><td>—</td><td>Minimum available slots</td></tr>
+          <tr><td>country</td><td>string</td><td>—</td><td>Filter by country code</td></tr>
+          <tr><td>active</td><td>boolean</td><td>true</td><td>Filter by active status</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/countries</span><span class="endpoint-desc">Host counts by country</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all countries with registered hosts, including total host count, active host count and available slots per country.</p></div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/versions</span><span class="endpoint-desc">Sashimono version distribution</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all active Sashimono versions with host counts.</p></div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/stats</span><span class="endpoint-desc">Network summary statistics</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Network-wide statistics: total and active host counts, available slots, average reputation and balances, top countries and version distribution.</p></div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/health</span><span class="endpoint-desc">API health check</span>
+      </div>
+      <div class="endpoint-body"><p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns API status, host count, history snapshot count, last full scan timestamp and whether a scan is currently in progress.</p></div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- 03 EXAMPLES -->
+<div class="section" id="examples">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('examples-body','examples-toggle-label','examples-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">03 — Examples</div>
+      <h2 style="margin-bottom:0;">Query examples</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="examples-toggle-label">Expand</span>
+      <span id="examples-toggle-icon">▼</span>
+    </div>
+  </div>
+  <div id="examples-body" style="display:none;margin-top:1.5rem;">
+  <p style="color:var(--text2);margin-bottom:2.5rem;margin-top:1.5rem;max-width:600px;line-height:1.75;">Common queries shown in curl, browser fetch, and Node.js. All examples target <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">https://api.onledger.net</code>.</p>
+  <div class="examples-grid">
+
+    <!-- 1 -->
+    <div class="example-block">
+      <div class="example-title">Find active hosts with available slots</div>
+      <div class="example-desc">The most common query — active hosts with at least one free slot, sorted by reputation.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex1','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex1','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex1','node')">Node.js</button>
+      </div>
+      <div id="ex1-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts?active=true&minSlots=1&limit=20</span>"</div>
+      <div id="ex1-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minSlots=1&limit=20'</span>);
+<span class="key">const</span> { hosts, total } = <span class="key">await</span> res.json();
+console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> matching hosts`</span>);
+hosts.forEach(h => console.log(h.address, h.availableInstances));</div>
+      <div id="ex1-node" class="code-block ex-code" style="display:none"><span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minSlots=1&limit=20'</span>);
+<span class="key">const</span> { hosts } = <span class="key">await</span> res.json();
+console.log(hosts.map(h => h.address));</div>
+    </div>
+
+    <!-- 2 -->
+    <div class="example-block">
+      <div class="example-title">Look up a single host</div>
+      <div class="example-desc">Fetch the complete data object for one host by its XRPL address.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex2','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex2','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex2','node')">Node.js</button>
+      </div>
+      <div id="ex2-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV</span>"</div>
+      <div id="ex2-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
+<span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>);
+<span class="key">const</span> { host } = <span class="key">await</span> res.json();
+console.log(host.domain, host.hostReputation, host.availableInstances);</div>
+      <div id="ex2-node" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
+<span class="key">const</span> { host } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">`</span>)
+  .then(r => r.json());
+console.log(host);</div>
+    </div>
+
+    <!-- 3 -->
+    <div class="example-block">
+      <div class="example-title">High-reputation hosts only</div>
+      <div class="example-desc">Filter to hosts with a reputation score above 240 — the upper tier of the 0–255 range.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex3','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex3','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex3','node')">Node.js</button>
+      </div>
+      <div id="ex3-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts?active=true&minRep=240&limit=50</span>"</div>
+      <div id="ex3-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> res = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRep=240&limit=50'</span>);
+<span class="key">const</span> { hosts } = <span class="key">await</span> res.json();
+<span class="comment">// shuffle for random selection</span>
+hosts.sort(() => Math.random() - 0.5);
+<span class="key">const</span> picked = hosts.slice(<span class="val">0</span>, <span class="val">10</span>);
+console.log(picked.map(h => h.address));</div>
+      <div id="ex3-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts?active=true&minRep=240&limit=500'</span>).then(r => r.json());
+<span class="comment">// Fisher-Yates shuffle</span>
+<span class="key">for</span> (<span class="key">let</span> i = hosts.length - <span class="val">1</span>; i > <span class="val">0</span>; i--) {
+  <span class="key">const</span> j = Math.floor(Math.random() * (i + <span class="val">1</span>));
+  [hosts[i], hosts[j]] = [hosts[j], hosts[i]];
+}
+console.log(hosts.slice(<span class="val">0</span>, <span class="val">10</span>).map(h => h.address));</div>
+    </div>
+
+    <!-- 4 -->
+    <div class="example-block">
+      <div class="example-title">Filter by country</div>
+      <div class="example-desc">Find active hosts in a specific country, sorted by cheapest lease price.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex4','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex4','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex4','node')">Node.js</button>
+      </div>
+      <div id="ex4-curl" class="code-block ex-code"><span class="comment"># New Zealand hosts, cheapest first</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&country=NZ&sortBy=leaseDrops&sortDir=asc</span>"</div>
+      <div id="ex4-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> params = <span class="key">new</span> URLSearchParams({ active: <span class="val">'true'</span>, country: <span class="val">'NZ'</span>, sortBy: <span class="val">'leaseDrops'</span>, sortDir: <span class="val">'asc'</span> });
+<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts?</span><span class="key">${params}</span><span class="val">`</span>).then(r => r.json());
+console.log(hosts);</div>
+      <div id="ex4-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
+  <span class="val">'https://api.onledger.net/hosts?active=true&country=NZ&sortBy=leaseDrops&sortDir=asc'</span>
+).then(r => r.json());
+console.log(<span class="val">`Found </span><span class="key">${hosts.length}</span><span class="val"> NZ hosts`</span>);</div>
+    </div>
+
+    <!-- 5 -->
+    <div class="example-block">
+      <div class="example-title">Hosts with sufficient resources</div>
+      <div class="example-desc">Find hosts meeting minimum hardware requirements before deploying a contract.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex5','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex5','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex5','node')">Node.js</button>
+      </div>
+      <div id="ex5-curl" class="code-block ex-code"><span class="comment"># At least 4GB RAM, 20GB disk, 1 free slot</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sortBy=ramMb&sortDir=desc</span>"</div>
+      <div id="ex5-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(
+  <span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1'</span>
+).then(r => r.json());
+console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> hosts meet requirements`</span>);</div>
+      <div id="ex5-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
+  <span class="val">'https://api.onledger.net/hosts?active=true&minRam=4096&minDisk=20000&minSlots=1&sortBy=ramMb&sortDir=desc&limit=50'</span>
+).then(r => r.json());
+console.log(hosts.map(h => ({ address: h.address, ram: h.ramMb, disk: h.diskMb })));</div>
+    </div>
+
+    <!-- 6 -->
+    <div class="example-block">
+      <div class="example-title">Batch lookup by address</div>
+      <div class="example-desc">POST an array of addresses to fetch up to 100 hosts in a single request — efficient for cluster managers.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex6','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex6','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex6','node')">Node.js</button>
+      </div>
+      <div id="ex6-curl" class="code-block ex-code">curl -X POST "<span class="url">https://api.onledger.net/hosts/batch</span>" \
+  -H "Content-Type: application/json" \
+  -d '{"addresses":["rXXX","rYYY","rZZZ"]}'</div>
+      <div id="ex6-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts/batch'</span>, {
+  method: <span class="val">'POST'</span>,
+  headers: { <span class="val">'Content-Type'</span>: <span class="val">'application/json'</span> },
+  body: JSON.stringify({ addresses: [<span class="val">'rXXX'</span>, <span class="val">'rYYY'</span>, <span class="val">'rZZZ'</span>] })
+}).then(r => r.json());
+console.log(hosts);</div>
+      <div id="ex6-node" class="code-block ex-code" style="display:none"><span class="key">const</span> myNodes = [<span class="val">'rXXX'</span>, <span class="val">'rYYY'</span>, <span class="val">'rZZZ'</span>];
+<span class="key">const</span> { hosts, found } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts/batch'</span>, {
+  method: <span class="val">'POST'</span>,
+  headers: { <span class="val">'Content-Type'</span>: <span class="val">'application/json'</span> },
+  body: JSON.stringify({ addresses: myNodes })
+}).then(r => r.json());
+console.log(<span class="val">`Found </span><span class="key">${found}</span><span class="val"> of </span><span class="key">${myNodes.length}</span><span class="val"> hosts`</span>);</div>
+    </div>
+
+    <!-- 7 -->
+    <div class="example-block">
+      <div class="example-title">Compare multiple hosts</div>
+      <div class="example-desc">Fetch full data for several hosts in one request — ideal for side-by-side comparison before choosing where to deploy.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex7','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex7','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex7','node')">Node.js</button>
+      </div>
+      <div id="ex7-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/compare?addresses=rXXX,rYYY,rZZZ</span>"</div>
+      <div id="ex7-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> addresses = [<span class="val">'rXXX'</span>, <span class="val">'rYYY'</span>, <span class="val">'rZZZ'</span>].join(<span class="val">','</span>);
+<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/compare?addresses=</span><span class="key">${addresses}</span><span class="val">`</span>).then(r => r.json());
+hosts.forEach(h => console.log(h.address, h.hostReputation, h.availableInstances));</div>
+      <div id="ex7-node" class="code-block ex-code" style="display:none"><span class="key">const</span> addresses = [<span class="val">'rXXX'</span>, <span class="val">'rYYY'</span>, <span class="val">'rZZZ'</span>];
+<span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
+  <span class="val">`https://api.onledger.net/hosts/compare?addresses=</span><span class="key">${addresses.join(',')}</span><span class="val">`</span>
+).then(r => r.json());
+console.log(hosts);</div>
+    </div>
+
+    <!-- 8 -->
+    <div class="example-block">
+      <div class="example-title">Search by domain, email or description</div>
+      <div class="example-desc">Full text search across operator-provided fields — useful for finding a specific host operator by name.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex8','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex8','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex8','node')">Node.js</button>
+      </div>
+      <div id="ex8-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/search?q=onledger&active=true</span>"</div>
+      <div id="ex8-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(<span class="val">'https://api.onledger.net/hosts/search?q=onledger&active=true'</span>).then(r => r.json());
+console.log(<span class="val">`</span><span class="key">${total}</span><span class="val"> results`</span>, hosts);</div>
+      <div id="ex8-node" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
+  <span class="val">'https://api.onledger.net/hosts/search?q=onledger&active=true'</span>
+).then(r => r.json());
+console.log(hosts);</div>
+    </div>
+
+    <!-- 9 -->
+    <div class="example-block">
+      <div class="example-title">Paginate through all hosts</div>
+      <div class="example-desc">Use limit and offset to page through the full host list in batches.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex9','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex9','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex9','node')">Node.js</button>
+      </div>
+      <div id="ex9-curl" class="code-block ex-code"><span class="comment"># Page 1</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&limit=100&offset=0</span>"
+<span class="comment"># Page 2</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&limit=100&offset=100</span>"</div>
+      <div id="ex9-fetch" class="code-block ex-code" style="display:none"><span class="key">async function</span> getAllHosts() {
+  <span class="key">const</span> pageSize = <span class="val">100</span>;
+  <span class="key">let</span> offset = <span class="val">0</span>, all = [];
+  <span class="key">while</span> (<span class="val">true</span>) {
+    <span class="key">const</span> { hosts } = <span class="key">await</span> fetch(
+      <span class="val">`https://api.onledger.net/hosts?active=true&limit=</span><span class="key">${pageSize}</span><span class="val">&offset=</span><span class="key">${offset}</span><span class="val">`</span>
+    ).then(r => r.json());
+    <span class="key">if</span> (!hosts.length) <span class="key">break</span>;
+    all = all.concat(hosts);
+    offset += pageSize;
+  }
+  <span class="key">return</span> all;
+}</div>
+      <div id="ex9-node" class="code-block ex-code" style="display:none"><span class="key">async function</span> getAllHosts() {
+  <span class="key">const</span> pageSize = <span class="val">100</span>;
+  <span class="key">let</span> offset = <span class="val">0</span>, all = [], done = <span class="val">false</span>;
+  <span class="key">while</span> (!done) {
+    <span class="key">const</span> { hosts, total } = <span class="key">await</span> fetch(
+      <span class="val">`https://api.onledger.net/hosts?active=true&limit=</span><span class="key">${pageSize}</span><span class="val">&offset=</span><span class="key">${offset}</span><span class="val">`</span>
+    ).then(r => r.json());
+    all = all.concat(hosts);
+    offset += pageSize;
+    done = all.length >= total;
+  }
+  console.log(<span class="val">`Fetched </span><span class="key">${all.length}</span><span class="val"> hosts`</span>);
+  <span class="key">return</span> all;
+}
+getAllHosts();</div>
+    </div>
+
+    <!-- 10 -->
+    <div class="example-block">
+      <div class="example-title">Top hosts leaderboard</div>
+      <div class="example-desc">Rank active hosts by reputation, earnings, resources or available slots.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex10','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex10','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex10','node')">Node.js</button>
+      </div>
+      <div id="ex10-curl" class="code-block ex-code"><span class="comment"># Top 10 by accumulated EVR rewards</span>
+curl "<span class="url">https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10</span>"</div>
+      <div id="ex10-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> { hosts, label } = <span class="key">await</span> fetch(
+  <span class="val">'https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10'</span>
+).then(r => r.json());
+console.log(label, hosts.map(h => ({ address: h.address, reward: h.accumulatedReward })));</div>
+      <div id="ex10-node" class="code-block ex-code" style="display:none"><span class="key">const</span> metrics = [<span class="val">'hostReputation'</span>, <span class="val">'accumulatedReward'</span>, <span class="val">'ramMb'</span>];
+<span class="key">const</span> results = <span class="key">await</span> Promise.all(
+  metrics.map(m => fetch(<span class="val">`https://api.onledger.net/leaderboard?metric=</span><span class="key">${m}</span><span class="val">&limit=5`</span>).then(r => r.json()))
+);
+results.forEach(r => console.log(r.label, r.hosts.map(h => h.address)));</div>
+    </div>
+
+    <!-- 11 -->
+    <div class="example-block">
+      <div class="example-title">Host heartbeat history</div>
+      <div class="example-desc">Track reputation, slots and balance changes over time for a specific host.</div>
+      <div class="lang-tabs">
+        <button class="lang-tab active" onclick="switchTab(this,'ex11','curl')">curl</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex11','fetch')">fetch</button>
+        <button class="lang-tab" onclick="switchTab(this,'ex11','node')">Node.js</button>
+      </div>
+      <div id="ex11-curl" class="code-block ex-code">curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV/history?limit=50</span>"</div>
+      <div id="ex11-fetch" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
+<span class="key">const</span> { history } = <span class="key">await</span> fetch(<span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">/history?limit=50`</span>).then(r => r.json());
+history.forEach(h => console.log(new Date(h.timestamp).toISOString(), h.hostReputation));</div>
+      <div id="ex11-node" class="code-block ex-code" style="display:none"><span class="key">const</span> address = <span class="val">'rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV'</span>;
+<span class="key">const</span> { history, domain } = <span class="key">await</span> fetch(
+  <span class="val">`https://api.onledger.net/hosts/</span><span class="key">${address}</span><span class="val">/history`</span>
+).then(r => r.json());
+console.log(<span class="val">`</span><span class="key">${domain}</span><span class="val">: </span><span class="key">${history.length}</span><span class="val"> snapshots`</span>);
+console.log(history);</div>
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<!-- 04 BUILDER -->
+<div class="section" id="builder">
+  <div class="section-label">04 — Try It</div>
+  <h2>Live query builder</h2>
+  <p style="color:var(--text2);margin-bottom:2rem;max-width:500px;line-height:1.75;">Build a query and see the live response directly from the API.</p>
+  <div class="builder">
+    <div class="builder-form">
+      <div class="form-row">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Min Reputation
+            <span class="info-tip" data-tip="Reputation is scored 0–255 by the Evernode reputation contract, which deploys test contracts to each host and measures performance. Higher is better. 200+ is a solid threshold — 240+ is the top tier.">?</span>
+          </label>
+          <input type="number" id="q-minRep" value="200" min="0" max="255">
+        </div>
+        <div class="form-group">
+          <label>Min Available Instances</label>
+          <input type="number" id="q-minSlots" value="1" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Min Host XAH
+            <span class="info-tip" data-tip="XAH is the native Xahau currency. Hosts need sufficient XAH to pay transaction fees and maintain their account. A low balance may indicate the host cannot reliably accept new contracts.">?</span>
+          </label>
+          <input type="number" id="q-minXah" value="5">
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Min Host EVR
+            <span class="info-tip" data-tip="EVR is the Evernode utility token. Hosts earn EVR for running contracts and need a sufficient balance to remain active. A healthy EVR balance indicates an established, active host.">?</span>
+          </label>
+          <input type="number" id="q-minEvr" value="5">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Country</label>
+          <select id="q-country"><option value="">Any country</option></select>
+        </div>
+        <div class="form-group">
+          <label>Domain contains</label>
+          <input type="text" id="q-domain" placeholder="e.g. onledger">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Version</label>
+          <select id="q-version"><option value="">Any</option></select>
+        </div>
+        <div class="form-group">
+          <label>Limit</label>
+          <input type="number" id="q-limit" value="5" min="1" max="100">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Exclude transferring hosts
+            <span class="info-tip" data-tip="Hosts in transfer mode may not reliably accept new contracts. Enabling this filter (isATransferer=0) excludes them.">?</span>
+          </label>
+          <select id="q-transferer">
+            <option value="">Include all</option>
+            <option value="0">Exclude transferring</option>
+            <option value="1">Only transferring</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Reputation tested only
+            <span class="info-tip" data-tip="Only return hosts actively being tested by the reputation contract on each heartbeat.">?</span>
+          </label>
+          <select id="q-reputed">
+            <option value="">Any</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Sort By</label>
+          <select id="q-sortBy">
+            <option value="hostReputation">Reputation</option>
+            <option value="availableInstances">Available Instances</option>
+            <option value="leaseDrops">Lease Price</option>
+            <option value="xahBalance">XAH Balance</option>
+            <option value="evrBalance">EVR Balance</option>
+            <option value="ramMb">RAM</option>
+            <option value="diskMb">Disk</option>
+            <option value="lastHeartbeatIndex">Last Heartbeat</option>
+            <option value="registrationTimestamp">Registration Date</option>
+            <option value="accumulatedReward">Accumulated Reward</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Sort Direction</label>
+          <select id="q-sortDir">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:5px;">Include unscored (rep=0)
+          <span class="info-tip" data-tip="Hosts with a reputation of 0 have not yet been tested by the reputation contract, or failed testing. Excluded by default.">?</span>
+        </label>
+        <select id="q-unscored"><option value="">No</option><option value="true">Yes</option></select>
+      </div>
+      <button class="btn btn-primary" onclick="runQuery()" style="width:100%;justify-content:center;padding:0.7rem;">Run query</button>
+    </div>
+    <div class="builder-result">
+      <div class="result-header">
+        <span>Response</span>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span class="result-count" id="result-count"></span>
+          <button class="dl-btn" id="dl-json" onclick="downloadJSON()" style="display:none">↓ JSON</button>
+          <button class="dl-btn" id="dl-csv" onclick="downloadCSV()" style="display:none">↓ CSV</button>
+        </div>
+      </div>
+      <div class="result-body" id="result-body">Click "Run query" to see live results...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 05 DATA FIELDS -->
+<div class="section">
+  <div class="section-label">05 — Data Fields</div>
+  <h2>Host object</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;max-width:600px;line-height:1.75;">Every host object returned by the API contains the following fields.</p>
+  <div class="code-block" style="line-height:1.95">{
+  <span class="key">"address"</span>:               <span class="val">"rXXX..."</span>          <span class="comment">// XRPL address</span>
+  <span class="key">"active"</span>:                <span class="val">1</span>                  <span class="comment">// 1=active, 0=inactive</span>
+  <span class="key">"domain"</span>:                <span class="val">"host.example.com"</span>  <span class="comment">// host domain</span>
+  <span class="key">"description"</span>:           <span class="val">"My Evernode host"</span>  <span class="comment">// operator-provided description (may be null)</span>
+  <span class="key">"countryCode"</span>:           <span class="val">"NZ"</span>               <span class="comment">// ISO 3166-1 alpha-2</span>
+  <span class="key">"maxInstances"</span>:          <span class="val">3</span>                  <span class="comment">// total instances configured</span>
+  <span class="key">"activeInstances"</span>:       <span class="val">1</span>                  <span class="comment">// currently in use</span>
+  <span class="key">"availableInstances"</span>:    <span class="val">2</span>                  <span class="comment">// free slots</span>
+  <span class="key">"leaseAmount"</span>:           <span class="val">"0.001"</span>            <span class="comment">// EVR per moment (1hr)</span>
+  <span class="key">"leaseDrops"</span>:            <span class="val">1000</span>               <span class="comment">// drops (1 EVR = 1,000,000)</span>
+  <span class="key">"hostReputation"</span>:        <span class="val">252</span>                <span class="comment">// 0–255, tested by reputation contract</span>
+  <span class="key">"reputedOnHeartbeat"</span>:    <span class="val">1</span>                  <span class="comment">// 1=reputation measured on heartbeat</span>
+  <span class="key">"version"</span>:               <span class="val">"1.0.0"</span>            <span class="comment">// sashimono version</span>
+  <span class="key">"cpuModelName"</span>:          <span class="val">"AMD EPYC..."</span>      <span class="comment">// CPU model</span>
+  <span class="key">"cpuCount"</span>:              <span class="val">4</span>                  <span class="comment">// allocated CPU cores</span>
+  <span class="key">"cpuMHz"</span>:                <span class="val">3200</span>               <span class="comment">// clock speed MHz</span>
+  <span class="key">"cpuMicrosec"</span>:           <span class="val">800000</span>             <span class="comment">// CPU microseconds allocated per round</span>
+  <span class="key">"ramMb"</span>:                 <span class="val">8192</span>               <span class="comment">// RAM in MB</span>
+  <span class="key">"diskMb"</span>:                <span class="val">32000</span>              <span class="comment">// disk in MB</span>
+  <span class="key">"email"</span>:                 <span class="val">"host@example.com"</span> <span class="comment">// operator contact email (may be null)</span>
+  <span class="key">"xahBalance"</span>:            <span class="val">34.5</span>               <span class="comment">// XAH balance</span>
+  <span class="key">"evrBalance"</span>:            <span class="val">12.3</span>               <span class="comment">// EVR balance</span>
+  <span class="key">"accumulatedReward"</span>:     <span class="val">"1.23"</span>             <span class="comment">// lifetime EVR rewards earned</span>
+  <span class="key">"uriTokenId"</span>:            <span class="val">"A848FB..."</span>        <span class="comment">// NFT token ID for host registration</span>
+  <span class="key">"registrationLedger"</span>:    <span class="val">12865596</span>           <span class="comment">// ledger index when host registered</span>
+  <span class="key">"registrationTimestamp"</span>: <span class="val">1705310292</span>         <span class="comment">// unix timestamp of registration</span>
+  <span class="key">"registrationFee"</span>:       <span class="val">500</span>                <span class="comment">// EVR paid to register</span>
+  <span class="key">"isATransferer"</span>:         <span class="val">0</span>                  <span class="comment">// 1=host is in transfer mode</span>
+  <span class="key">"transferTimestamp"</span>:     <span class="val">1747994331</span>         <span class="comment">// unix timestamp of last transfer (may be null)</span>
+  <span class="key">"supportVoteSent"</span>:       <span class="val">0</span>                  <span class="comment">// 1=host has sent a governance support vote</span>
+  <span class="key">"lastVoteCandidateIdx"</span>:  <span class="val">0</span>                  <span class="comment">// index of last governance vote candidate</span>
+  <span class="key">"lastVoteTimestamp"</span>:     <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last governance vote (may be null)</span>
+  <span class="key">"lastHeartbeatIndex"</span>:    <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last heartbeat</span>
+  <span class="key">"lastUpdated"</span>:           <span class="val">1775701701966</span>      <span class="comment">// last DB update (ms)</span>
+}</div>
+</div>
+
+<footer style="text-align:center;flex-direction:column;gap:0.5rem;">
+  <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3);">Updated every 6 hours + real-time heartbeats</div>
+  <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3);">Elephant Tools &middot; &copy; onledger.net 2026 &middot; Data via Xahau and Evernode</div>
+</footer>
+
+<script>
+  const API = 'https://api.onledger.net';
+
+  async function loadStats() {
+    try {
+      const [health, stats] = await Promise.all([
+        fetch(API + '/health').then(r => r.json()),
+        fetch(API + '/stats').then(r => r.json())
+      ]);
+      const s = stats.stats || {};
+      document.getElementById('stat-total').textContent = health.hostCount?.toLocaleString() || '—';
+      document.getElementById('stat-active').textContent = health.activeCount?.toLocaleString() || '—';
+      document.getElementById('stat-total-instances').textContent = s.totalInstances?.toLocaleString() || s.totalSlots?.toLocaleString() || '—';
+      document.getElementById('stat-avail-instances').textContent = s.totalAvailableInstances?.toLocaleString() || s.totalAvailableSlots?.toLocaleString() || '—';
+      document.getElementById('stat-used-instances').textContent = s.activeInstances?.toLocaleString() || (s.totalSlots && s.totalAvailableSlots ? (s.totalSlots - s.totalAvailableSlots).toLocaleString() : '—');
+      document.getElementById('stat-rep').textContent = s.avgReputation ? Math.round(s.avgReputation) : '—';
+      const bar = document.getElementById('highlight-bar');
+      const countries = stats.topCountries || [];
+      const versions = stats.versions || [];
+      const availInst = s.totalAvailableInstances || s.totalAvailableSlots;
+      const totalInst = s.totalInstances || s.totalSlots;
+      const items = [
+        `<strong>${health.activeCount?.toLocaleString()}</strong> active hosts`,
+        `<strong>${availInst?.toLocaleString()}</strong> available instances`,
+        `<strong>${totalInst?.toLocaleString()}</strong> total instances`,
+        `avg reputation <strong>${Math.round(s.avgReputation)}/255</strong>`,
+        ...countries.slice(0,4).map(c => `<strong>${c.countryCode}</strong> ${c.count} hosts`),
+        ...versions.map(v => `v${v.version} — <strong>${v.count}</strong> hosts`)
+      ];
+      const html = items.map(t => `<span class="ticker-item">⬡ ${t}</span>`).join('');
+      bar.innerHTML = html + html;
+    } catch(e) {
+      document.getElementById('highlight-bar').innerHTML = '<span class="ticker-item">⬡ Connecting to API...</span>';
+    }
+  }
+
+  async function loadCountries() {
+    try {
+      const data = await fetch(API + '/countries').then(r => r.json());
+      const sel = document.getElementById('q-country');
+      const names = new Intl.DisplayNames(['en'], { type: 'region' });
+      const countries = (data.countries || data).sort((a, b) => {
+        const na = names.of(a.countryCode) || a.countryCode;
+        const nb = names.of(b.countryCode) || b.countryCode;
+        return na.localeCompare(nb);
+      });
+      countries.forEach(c => {
+        const name = names.of(c.countryCode) || c.countryCode;
+        const count = c.count ?? c.totalHosts ?? c.hostCount ?? c.total ?? '';
+        const opt = document.createElement('option');
+        opt.value = c.countryCode;
+        opt.textContent = count !== '' ? `${name} (${count})` : name;
+        sel.appendChild(opt);
+      });
+    } catch(e) { console.warn('Could not load countries:', e.message); }
+  }
+
+  async function loadVersions() {
+    try {
+      const data = await fetch(API + '/versions').then(r => r.json());
+      const sel = document.getElementById('q-version');
+      (data.versions || []).forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.version;
+        opt.textContent = `${v.version} (${v.count})`;
+        sel.appendChild(opt);
+      });
+    } catch(e) { console.warn('Could not load versions:', e.message); }
+  }
+
+  function switchTab(btn, prefix, lang) {
+    btn.closest('.lang-tabs').querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll(`[id^="${prefix}-"]`).forEach(el => el.style.display = 'none');
+    document.getElementById(`${prefix}-${lang}`).style.display = 'block';
+  }
+
+  function toggleSection(bodyId, labelId, iconId) {
+    const body = document.getElementById(bodyId);
+    const label = document.getElementById(labelId);
+    const icon = document.getElementById(iconId);
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? 'block' : 'none';
+    label.textContent = collapsed ? 'Collapse' : 'Expand';
+    icon.textContent = collapsed ? '▲' : '▼';
+  }
+
+  function toggle(header) { header.nextElementSibling.classList.toggle('open'); }
+
+  function highlight(json) {
+    return json
+      .replace(/("[\w]+")\s*:/g, '<span class="json-key">$1</span>:')
+      .replace(/:\s*(".*?")/g, ': <span class="json-str">$1</span>')
+      .replace(/:\s*(\d+\.?\d*)/g, ': <span class="json-num">$1</span>')
+      .replace(/:\s*(true|false|null)/g, ': <span class="json-bool">$1</span>');
+  }
+
+  function toUTC(val, isMs) {
+    if (!val) return null;
+    return new Date(isMs ? val : val * 1000).toISOString().replace('T', ' ').replace('.000Z', ' UTC');
+  }
+
+  function convertTimestamps(hosts) {
+    return hosts.map(h => ({
+      ...h,
+      registrationTimestamp_utc: toUTC(h.registrationTimestamp, false),
+      lastUpdated_utc: toUTC(h.lastUpdated, true),
+      lastHeartbeatIndex_utc: toUTC(h.lastHeartbeatIndex, false)
+    }));
+  }
+
+  let _lastData = null;
+
+  async function runQuery() {
+    const params = new URLSearchParams({ active: 'true' });
+    const fields = {
+      'q-minRep':'minRep','q-minSlots':'minSlots','q-minXah':'minXah','q-minEvr':'minEvr',
+      'q-version':'version','q-sortBy':'sortBy','q-sortDir':'sortDir','q-limit':'limit',
+      'q-unscored':'includeUnscored'
+    };
+    for (const [id, param] of Object.entries(fields)) { const v = document.getElementById(id).value; if (v) params.set(param, v); }
+    const country = document.getElementById('q-country').value;
+    if (country) params.set('country', country);
+    const domain = document.getElementById('q-domain').value.trim();
+    if (domain) params.set('domain', domain);
+    const transferer = document.getElementById('q-transferer').value;
+    if (transferer !== '') params.set('isATransferer', transferer);
+    const reputed = document.getElementById('q-reputed').value;
+    if (reputed) params.set('reputedOnHeartbeat', reputed);
+
+    const body = document.getElementById('result-body');
+    const count = document.getElementById('result-count');
+    body.innerHTML = 'Loading...'; count.textContent = '';
+    document.getElementById('dl-json').style.display = 'none';
+    document.getElementById('dl-csv').style.display = 'none';
+    try {
+      const data = await fetch(API + '/hosts?' + params.toString()).then(r => r.json());
+      _lastData = convertTimestamps(data.hosts || []);
+      count.textContent = data.total + ' matching';
+      const display = { ...data, hosts: _lastData };
+      body.innerHTML = highlight(JSON.stringify(display, null, 2));
+      if (_lastData.length) {
+        document.getElementById('dl-json').style.display = 'inline-block';
+        document.getElementById('dl-csv').style.display = 'inline-block';
+      }
+    } catch(e) { body.innerHTML = 'Error: ' + e.message; }
+  }
+
+  function downloadJSON() {
+    if (!_lastData) return;
+    const blob = new Blob([JSON.stringify(_lastData, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'evernode-hosts.json'; a.click();
+  }
+
+  function downloadCSV() {
+    if (!_lastData || !_lastData.length) return;
+    const keys = Object.keys(_lastData[0]);
+    const rows = [keys.join(','), ..._lastData.map(h =>
+      keys.map(k => {
+        const v = h[k] == null ? '' : String(h[k]);
+        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+      }).join(',')
+    )];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'evernode-hosts.csv'; a.click();
+  }
+
+  loadStats();
+  loadCountries();
+  loadVersions();
+</script>
+</body>
+</html>
