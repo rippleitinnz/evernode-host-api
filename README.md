@@ -10,10 +10,13 @@ Developer portal: **https://api.onledger.net/public/**
 ## Features
 
 - 12,000+ registered Evernode hosts tracked
+- All host data sourced directly from the Xahau registry hook
 - Real-time updates via Xahau heartbeat subscriptions
 - Full host registry data including reputation, hardware specs, balances, governance fields
 - Heartbeat history tracking per host (from v1.2.0)
 - Full text search across domain, email and description
+- Null/not-null filtering on description, email and domain fields
+- Field selection — return only the fields you need
 - Leaderboard, batch lookup, comparison and random sampling endpoints
 - SQLite-backed — zero external dependencies for the data layer
 - CORS enabled for browser requests
@@ -112,9 +115,43 @@ curl http://localhost:3001/health
 | isATransferer | integer | — | 0=exclude transferring hosts, 1=only transferring |
 | reputedOnHeartbeat | boolean | — | true=only reputation-tested hosts |
 | minAccumulatedReward | number | — | Minimum lifetime EVR rewards earned |
+| hasDescription | boolean | — | true=only hosts with a description set, false=only hosts without |
+| hasEmail | boolean | — | true=only hosts with an email set, false=only hosts without |
+| hasDomain | boolean | — | true=only hosts with a domain set, false=only hosts without |
+| description_like | string | — | Partial match on description field |
+| fields | string | — | Comma-separated fields to return e.g. address,domain,hostReputation |
+| sort | string | — | Shorthand sort e.g. sort=hostReputation:desc (alternative to sortBy + sortDir) |
 | sortBy | string | hostReputation | hostReputation, availableInstances, leaseDrops, xahBalance, evrBalance, ramMb, diskMb, lastHeartbeatIndex, registrationTimestamp, accumulatedReward, lastUpdated |
 | sortDir | string | desc | asc or desc |
 | limit / offset | integer | 100 / 0 | Pagination |
+
+---
+
+## /hosts/search Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| q | string | — | Search term (min 2 chars) — matches domain, email and description. Optional if hasDescription or description_like is provided. |
+| hasDescription | boolean | — | true=only hosts with a description set |
+| description_like | string | — | Partial match on description only |
+| active | boolean | — | Filter by active status |
+| fields | string | — | Comma-separated fields to return |
+| limit | integer | 50 | Max results (up to 200) |
+
+---
+
+## Pagination
+
+All list endpoints return the following pagination metadata alongside results:
+
+| Field | Description |
+|-------|-------------|
+| total | Total matching records |
+| limit | Page size used |
+| offset | Current offset |
+| hasMore | true if more results are available |
+| nextOffset | Pass as offset for the next page (null if last page) |
+| prevOffset | Pass as offset for the previous page (null if first page) |
 
 ---
 
@@ -171,6 +208,9 @@ curl "https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV"
 # Search by domain, email or description
 curl "https://api.onledger.net/hosts/search?q=onledger"
 
+# All hosts with a description set
+curl "https://api.onledger.net/hosts/search?hasDescription=true&active=true"
+
 # Top hosts by accumulated reward
 curl "https://api.onledger.net/leaderboard?metric=accumulatedReward&limit=10"
 
@@ -195,6 +235,7 @@ curl "https://api.onledger.net/stats"
 
 - `hosts.db` is excluded from the repo — generated on first run
 - Full scan runs on startup if no data exists, then every 6 hours
+- Host address list is sourced directly from the Xahau registry hook via `account_namespace` queries to the local node
 - Real-time updates via heartbeat subscription to the Xahau ledger
 - History snapshots accumulate from v1.2.0 onwards (max 500 per host)
 - The developer portal (`public/index.html`) is a single-file static site — no build step required

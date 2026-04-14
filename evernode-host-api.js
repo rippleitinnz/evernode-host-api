@@ -10,24 +10,55 @@
 
 'use strict';
 
-const https    = require('https');
-const http     = require('http');
-const fs       = require('fs');
 const path     = require('path');
 const Database = require('better-sqlite3');
 const express  = require('express');
 
 // ── Config ────────────────────────────────────────────────────
-const VERSION           = '1.3.0';
+const VERSION           = '1.4.0';
 const XAHAU_WS          = process.env.XAHAU_WS        || 'ws://localhost:6008';
 const API_PORT          = parseInt(process.env.API_PORT || '3001');
 const HEARTBEAT_ACCOUNT = 'rHktfGUbjqzU4GsYCMc1pDjdHXb5CJamto';
-const XRPLWIN_API       = 'https://xahau.xrplwin.com/api/evernode/hosts';
+const GOVERNOR_ADDRESS  = 'rBvKgF3jSZWdJcwSsmoJspoXLLDVLDp6jg';
+const HOOK_NAMESPACE    = '01EAF09326B4911554384121FF56FA8FECC215FDDE2EC35D9E59F2C53EC665A0';
+const HOST_ADDR_PREFIX  = '45565203'; // EVR + type 03 = host address entry
 const BATCH_SIZE        = 50;
 const BATCH_DELAY_MS    = 100;
 const DB_PATH           = path.join(__dirname, 'hosts.db');
 const EVDEVKIT_PATH     = '/root/.nvm/versions/node/v22.16.0/lib/node_modules/evdevkit/node_modules';
 const HISTORY_MAX_ROWS  = 500;
+
+// ── Rate limiting ─────────────────────────────────────────────
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX       = 120;        // requests per window
+
+const rateLimit = (req, res, next) => {
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip) || { count: 0, start: now };
+    if (now - entry.start > RATE_LIMIT_WINDOW_MS) {
+        entry.count = 1;
+        entry.start = now;
+    } else {
+        entry.count++;
+    }
+    rateLimitMap.set(ip, entry);
+    if (entry.count > RATE_LIMIT_MAX) {
+        return res.status(429).json({ success: false, error: 'Rate limit exceeded. Max 120 requests per minute.' });
+    }
+    res.setHeader('X-RateLimit-Limit', RATE_LIMIT_MAX);
+    res.setHeader('X-RateLimit-Remaining', Math.max(0, RATE_LIMIT_MAX - entry.count));
+    next();
+};
+
+// Clean up rate limit map every 5 minutes
+setInterval(() => {
+    const cutoff = Date.now() - RATE_LIMIT_WINDOW_MS;
+    for (const [ip, entry] of rateLimitMap.entries()) {
+        if (entry.start < cutoff) rateLimitMap.delete(ip);
+    }
+}, 5 * 60 * 1000);
 
 // ── Database ──────────────────────────────────────────────────
 const db = new Database(DB_PATH);
@@ -93,6 +124,59 @@ db.exec(`
 
 const setMeta = db.prepare('INSERT OR REPLACE INTO meta (key,value) VALUES (?,?)');
 const getMeta = (key) => { const r = db.prepare('SELECT value FROM meta WHERE key=?').get(key); return r?.value; };
+
+// ── Allowed fields & sort ─────────────────────────────────────
+const ALL_FIELDS = [
+    'address','active','domain','countryCode','maxInstances','activeInstances','availableInstances',
+    'leaseAmount','leaseDrops','hostReputation','version','cpuModelName','cpuCount','cpuMHz',
+    'cpuMicrosec','ramMb','diskMb','email','accumulatedReward','xahBalance','evrBalance',
+    'registrationTimestamp','lastHeartbeatIndex','description','uriTokenId','registrationLedger',
+    'registrationFee','isATransferer','transferTimestamp','supportVoteSent','reputedOnHeartbeat',
+    'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated'
+];
+
+const ALLOWED_SORT = [
+    'hostReputation','availableInstances','leaseDrops','xahBalance','evrBalance',
+    'ramMb','diskMb','countryCode','version','lastHeartbeatIndex',
+    'registrationTimestamp','accumulatedReward','lastUpdated'
+];
+
+// Parse ?sort=field:dir or ?sortBy=field&sortDir=dir
+const parseSort = (query) => {
+    if (query.sort) {
+        const parts = query.sort.split(':');
+        const field = parts[0]?.trim();
+        const dir   = parts[1]?.trim().toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+        return { field: ALLOWED_SORT.includes(field) ? field : 'hostReputation', dir };
+    }
+    return {
+        field: ALLOWED_SORT.includes(query.sortBy) ? query.sortBy : 'hostReputation',
+        dir: query.sortDir === 'asc' ? 'ASC' : 'DESC'
+    };
+};
+
+// Parse ?fields=address,domain,reputation — validate against allowed list
+const parseFields = (fieldsParam) => {
+    if (!fieldsParam) return '*';
+    const requested = fieldsParam.split(',').map(f => f.trim()).filter(f => ALL_FIELDS.includes(f));
+    if (!requested.length) return '*';
+    // Always include address
+    if (!requested.includes('address')) requested.unshift('address');
+    return requested.join(', ');
+};
+
+// Apply field selection to results
+const applyFields = (rows, fieldsParam) => {
+    if (!fieldsParam) return rows;
+    const requested = fieldsParam.split(',').map(f => f.trim()).filter(f => ALL_FIELDS.includes(f));
+    if (!requested.length) return rows;
+    if (!requested.includes('address')) requested.unshift('address');
+    return rows.map(row => {
+        const out = {};
+        requested.forEach(f => { out[f] = row[f]; });
+        return out;
+    });
+};
 
 // ── Evernode client setup ─────────────────────────────────────
 let evernode, xrplApi, registryClient;
@@ -229,22 +313,51 @@ const hostToRow = (info, balances = { xah: 0, evr: 0 }) => ({
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 let scanInProgress = false;
 
+// Fetch all registered host addresses directly from the Evernode registry hook
+// on the local Xahau node — no external API dependency
+const getRegisteredAddresses = () => new Promise((resolve, reject) => {
+    const codec = require(path.join(EVDEVKIT_PATH, 'ripple-address-codec'));
+    const ws = new WS(XAHAU_WS);
+    const allEntries = [];
+    let marker = null;
+
+    const fetchPage = () => {
+        const req = {
+            command: 'account_namespace',
+            account: GOVERNOR_ADDRESS,
+            namespace_id: HOOK_NAMESPACE,
+            limit: 400
+        };
+        if (marker) req.marker = marker;
+        ws.send(JSON.stringify(req));
+    };
+
+    ws.on('open', () => fetchPage());
+    ws.on('message', d => {
+        try {
+            const r = JSON.parse(d);
+            const entries = r.result?.namespace_entries || [];
+            for (const entry of entries) {
+                if (entry.HookStateKey?.startsWith(HOST_ADDR_PREFIX)) {
+                    const accountId = Buffer.from(entry.HookStateKey, 'hex').slice(12);
+                    try { allEntries.push(codec.encodeAccountID(accountId)); } catch {}
+                }
+            }
+            if (r.result?.marker) { marker = r.result.marker; fetchPage(); }
+            else { ws.close(); resolve(allEntries); }
+        } catch(e) { ws.close(); reject(e); }
+    });
+    ws.on('error', (e) => reject(e));
+    setTimeout(() => { ws.close(); reject(new Error('getRegisteredAddresses timed out')); }, 60000);
+});
+
 const fullScan = async () => {
     if (scanInProgress) { console.log('[Scan] Already in progress, skipping'); return; }
     scanInProgress = true;
     const start = Date.now();
-    console.log('[Scan] Starting full host scan...');
+    console.log('[Scan] Starting full host scan via registry hook...');
     try {
-        const data = await new Promise((resolve, reject) => {
-            https.get(XRPLWIN_API, res => {
-                let d = ''; res.on('data', c => d += c);
-                res.on('end', () => { try { resolve(JSON.parse(d)); } catch(e) { reject(e); } });
-            }).on('error', reject);
-        });
-        const priceMap = {};
-        const allAddresses = data.data
-            .filter(h => h.host)
-            .map(h => { if (h.leaseprice_evr_drops) priceMap[h.host] = h.leaseprice_evr_drops; return h.host; });
+        const allAddresses = await getRegisteredAddresses();
         console.log(`[Scan] ${allAddresses.length} registered hosts found`);
         setMeta.run('totalRegistered', String(allAddresses.length));
         let processed = 0, active = 0;
@@ -331,13 +444,21 @@ app.use((req, res, next) => {
     res.header('Access-Control-Allow-Headers', 'Content-Type');
     next();
 });
+app.use(rateLimit);
 
-// ── Allowed sort fields ───────────────────────────────────────
-const allowedSort = [
-    'hostReputation','availableInstances','leaseDrops','xahBalance','evrBalance',
-    'ramMb','diskMb','countryCode','version','lastHeartbeatIndex',
-    'registrationTimestamp','accumulatedReward','lastUpdated'
-];
+// ── Pagination helper ─────────────────────────────────────────
+const buildPagination = (total, limit, offset) => {
+    const intLimit  = parseInt(limit);
+    const intOffset = parseInt(offset);
+    return {
+        total,
+        limit:       intLimit,
+        offset:      intOffset,
+        hasMore:     intOffset + intLimit < total,
+        nextOffset:  intOffset + intLimit < total ? intOffset + intLimit : null,
+        prevOffset:  intOffset > 0 ? Math.max(0, intOffset - intLimit) : null
+    };
+};
 
 // GET /hosts — filtered host list
 app.get('/hosts', (req, res) => {
@@ -346,13 +467,23 @@ app.get('/hosts', (req, res) => {
         minXah = '5', minEvr = '5', minLease, maxLease, country, domain,
         version, minRam, minDisk, isATransferer, reputedOnHeartbeat,
         minAccumulatedReward,
-        sortBy = 'hostReputation', sortDir = 'desc', limit = 100, offset = 0
+        // null/not-null filters
+        hasDescription, hasEmail, hasDomain,
+        // partial match filters
+        description_like,
+        // field selection
+        fields,
+        // pagination
+        limit = 100, offset = 0
     } = req.query;
 
+    const { field: sortField, dir: sortDir } = parseSort(req.query);
+
     let where = [], params = [];
-    if (active !== undefined)             { where.push('active = ?');                          params.push(active === 'true' || active === '1' ? 1 : 0); }
-    if (minSlots !== undefined)           { where.push('availableInstances >= ?');             params.push(parseInt(minSlots)); }
-    if (maxSlots !== undefined)           { where.push('availableInstances <= ?');             params.push(parseInt(maxSlots)); }
+
+    if (active !== undefined)             { where.push('active = ?');                             params.push(active === 'true' || active === '1' ? 1 : 0); }
+    if (minSlots !== undefined)           { where.push('availableInstances >= ?');                params.push(parseInt(minSlots)); }
+    if (maxSlots !== undefined)           { where.push('availableInstances <= ?');                params.push(parseInt(maxSlots)); }
     if (minRep !== undefined) {
         if (includeUnscored === 'true' || includeUnscored === '1') {
             where.push('(hostReputation >= ? OR hostReputation = 0 OR hostReputation IS NULL)');
@@ -362,84 +493,114 @@ app.get('/hosts', (req, res) => {
             params.push(parseInt(minRep));
         }
     }
-    if (maxRep !== undefined)             { where.push('hostReputation <= ?');                 params.push(parseInt(maxRep)); }
-    if (minXah !== undefined)             { where.push('xahBalance >= ?');                     params.push(parseFloat(minXah)); }
-    if (minEvr !== undefined)             { where.push('evrBalance >= ?');                     params.push(parseFloat(minEvr)); }
-    if (minLease !== undefined)           { where.push('leaseDrops >= ?');                     params.push(parseInt(minLease)); }
-    if (maxLease !== undefined)           { where.push('leaseDrops <= ?');                     params.push(parseInt(maxLease)); }
-    if (country !== undefined)            { where.push('countryCode = ?');                     params.push(country.toUpperCase()); }
-    if (domain !== undefined)             { where.push('domain LIKE ?');                       params.push('%' + domain + '%'); }
-    if (version !== undefined)            { where.push('version = ?');                         params.push(version); }
-    if (minRam !== undefined)             { where.push('ramMb >= ?');                          params.push(parseInt(minRam)); }
-    if (minDisk !== undefined)            { where.push('diskMb >= ?');                         params.push(parseInt(minDisk)); }
-    if (isATransferer !== undefined)      { where.push('isATransferer = ?');                   params.push(parseInt(isATransferer)); }
-    if (reputedOnHeartbeat !== undefined) { where.push('reputedOnHeartbeat = ?');              params.push(reputedOnHeartbeat === 'true' || reputedOnHeartbeat === '1' ? 1 : 0); }
+    if (maxRep !== undefined)             { where.push('hostReputation <= ?');                    params.push(parseInt(maxRep)); }
+    if (minXah !== undefined)             { where.push('xahBalance >= ?');                        params.push(parseFloat(minXah)); }
+    if (minEvr !== undefined)             { where.push('evrBalance >= ?');                        params.push(parseFloat(minEvr)); }
+    if (minLease !== undefined)           { where.push('leaseDrops >= ?');                        params.push(parseInt(minLease)); }
+    if (maxLease !== undefined)           { where.push('leaseDrops <= ?');                        params.push(parseInt(maxLease)); }
+    if (country !== undefined)            { where.push('countryCode = ?');                        params.push(country.toUpperCase()); }
+    if (domain !== undefined)             { where.push('domain LIKE ?');                          params.push('%' + domain + '%'); }
+    if (version !== undefined)            { where.push('version = ?');                            params.push(version); }
+    if (minRam !== undefined)             { where.push('ramMb >= ?');                             params.push(parseInt(minRam)); }
+    if (minDisk !== undefined)            { where.push('diskMb >= ?');                            params.push(parseInt(minDisk)); }
+    if (isATransferer !== undefined)      { where.push('isATransferer = ?');                      params.push(parseInt(isATransferer)); }
+    if (reputedOnHeartbeat !== undefined) { where.push('reputedOnHeartbeat = ?');                 params.push(reputedOnHeartbeat === 'true' || reputedOnHeartbeat === '1' ? 1 : 0); }
     if (minAccumulatedReward !== undefined) { where.push('CAST(accumulatedReward AS REAL) >= ?'); params.push(parseFloat(minAccumulatedReward)); }
 
-    const safeSort = allowedSort.includes(sortBy) ? sortBy : 'hostReputation';
-    const safeDir  = sortDir === 'asc' ? 'ASC' : 'DESC';
+    // null / not-null filters
+    if (hasDescription === 'true')  { where.push("description IS NOT NULL AND description != ''"); }
+    if (hasDescription === 'false') { where.push("(description IS NULL OR description = '')"); }
+    if (hasEmail === 'true')        { where.push("email IS NOT NULL AND email != ''"); }
+    if (hasEmail === 'false')       { where.push("(email IS NULL OR email = '')"); }
+    if (hasDomain === 'true')       { where.push("domain IS NOT NULL AND domain != ''"); }
+    if (hasDomain === 'false')      { where.push("(domain IS NULL OR domain = '')"); }
+
+    // partial match filters
+    if (description_like !== undefined) { where.push('description LIKE ?'); params.push('%' + description_like + '%'); }
+
     const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const sql = `SELECT * FROM hosts ${whereClause} ORDER BY ${safeSort} ${safeDir} LIMIT ? OFFSET ?`;
+    const selectFields = parseFields(fields);
+    const sql = `SELECT ${selectFields} FROM hosts ${whereClause} ORDER BY ${sortField} ${sortDir} LIMIT ? OFFSET ?`;
     params.push(parseInt(limit), parseInt(offset));
 
     try {
-        const hosts = db.prepare(sql).all(...params);
+        const rows  = db.prepare(sql).all(...params);
         const total = db.prepare(`SELECT COUNT(*) as count FROM hosts ${whereClause}`).get(...params.slice(0,-2))?.count || 0;
-        res.json({ success: true, total, count: hosts.length, offset: parseInt(offset), hosts });
+        const hosts = fields ? applyFields(rows, fields) : rows;
+        res.json({ success: true, ...buildPagination(total, limit, offset), count: hosts.length, hosts });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// GET /hosts/search — full text search
+// GET /hosts/search — full text search with enhanced filters
 app.get('/hosts/search', (req, res) => {
-    const { q, active, limit = 50 } = req.query;
-    if (!q || q.trim().length < 2) return res.status(400).json({ success: false, error: 'Query parameter q is required (min 2 chars)' });
-    const term = '%' + q.trim() + '%';
-    let where = ['(domain LIKE ? OR email LIKE ? OR description LIKE ?)'];
-    let params = [term, term, term];
-    if (active !== undefined) { where.push('active = ?'); params.push(active === 'true' ? 1 : 0); }
+    const {
+        q, active, limit = 50,
+        hasDescription, description_like, fields
+    } = req.query;
+
+    let where = [], params = [];
+
+    // q searches domain, email, description
+    if (q && q.trim().length >= 2) {
+        const term = '%' + q.trim() + '%';
+        where.push('(domain LIKE ? OR email LIKE ? OR description LIKE ?)');
+        params.push(term, term, term);
+    }
+    if (active !== undefined)      { where.push('active = ?');                                   params.push(active === 'true' ? 1 : 0); }
+    if (hasDescription === 'true') { where.push("description IS NOT NULL AND description != ''"); }
+    if (description_like)          { where.push('description LIKE ?');                           params.push('%' + description_like + '%'); }
+
+    if (!where.length) return res.status(400).json({ success: false, error: 'At least one search parameter required: q, hasDescription, or description_like' });
+
     const whereClause = 'WHERE ' + where.join(' AND ');
-    const sql = `SELECT * FROM hosts ${whereClause} ORDER BY hostReputation DESC LIMIT ?`;
+    const selectFields = parseFields(fields);
+    const sql = `SELECT ${selectFields} FROM hosts ${whereClause} ORDER BY hostReputation DESC LIMIT ?`;
     params.push(Math.min(parseInt(limit) || 50, 200));
+
     try {
-        const hosts = db.prepare(sql).all(...params);
+        const rows  = db.prepare(sql).all(...params);
         const total = db.prepare(`SELECT COUNT(*) as count FROM hosts ${whereClause}`).get(...params.slice(0,-1))?.count || 0;
-        res.json({ success: true, query: q, total, count: hosts.length, hosts });
+        const hosts = fields ? applyFields(rows, fields) : rows;
+        res.json({ success: true, query: q || null, total, count: hosts.length, hosts });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /hosts/expiring — hosts silent for N hours
 app.get('/hosts/expiring', (req, res) => {
-    const { hours = 24, limit = 50 } = req.query;
+    const { hours = 24, limit = 50, fields } = req.query;
     const cutoff = Math.floor(Date.now() / 1000) - (parseInt(hours) * 3600);
+    const selectFields = parseFields(fields);
     try {
-        const hosts = db.prepare(`
-            SELECT * FROM hosts
+        const rows = db.prepare(`
+            SELECT ${selectFields} FROM hosts
             WHERE active = 1 AND lastHeartbeatIndex < ?
-            ORDER BY lastHeartbeatIndex ASC
-            LIMIT ?
+            ORDER BY lastHeartbeatIndex ASC LIMIT ?
         `).all(cutoff, Math.min(parseInt(limit) || 50, 200));
+        const hosts = fields ? applyFields(rows, fields) : rows;
         res.json({ success: true, silentSinceHours: parseInt(hours), count: hosts.length, hosts });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /hosts/compare — compare multiple hosts
 app.get('/hosts/compare', (req, res) => {
-    const { addresses } = req.query;
+    const { addresses, fields } = req.query;
     if (!addresses) return res.status(400).json({ success: false, error: 'addresses parameter required (comma-separated)' });
     const addrs = addresses.split(',').map(a => a.trim()).filter(Boolean).slice(0, 20);
     if (!addrs.length) return res.status(400).json({ success: false, error: 'No valid addresses provided' });
+    const selectFields = parseFields(fields);
     try {
         const placeholders = addrs.map(() => '?').join(',');
-        const hosts = db.prepare(`SELECT * FROM hosts WHERE address IN (${placeholders})`).all(...addrs);
-        const map = Object.fromEntries(hosts.map(h => [h.address, h]));
+        const rows = db.prepare(`SELECT ${selectFields} FROM hosts WHERE address IN (${placeholders})`).all(...addrs);
+        const map = Object.fromEntries(rows.map(h => [h.address, h]));
         const ordered = addrs.map(a => map[a] || { address: a, error: 'Not found' });
-        res.json({ success: true, count: hosts.length, hosts: ordered });
+        const hosts = fields ? applyFields(ordered.filter(h => !h.error), fields) : ordered;
+        res.json({ success: true, count: rows.length, hosts: ordered.map(h => h.error ? h : (fields ? applyFields([h], fields)[0] : h)) });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /leaderboard — top hosts by metric
 app.get('/leaderboard', (req, res) => {
-    const { metric = 'hostReputation', limit = 20 } = req.query;
+    const { metric = 'hostReputation', limit = 20, fields } = req.query;
     const allowedMetrics = {
         hostReputation:     { col: 'hostReputation',              label: 'Top Reputation' },
         accumulatedReward:  { col: 'CAST(accumulatedReward AS REAL)', label: 'Top Earners' },
@@ -450,51 +611,56 @@ app.get('/leaderboard', (req, res) => {
         availableInstances: { col: 'availableInstances',          label: 'Most Available Slots' }
     };
     const chosen = allowedMetrics[metric] || allowedMetrics.hostReputation;
+    const selectFields = parseFields(fields);
     try {
-        const hosts = db.prepare(`
-            SELECT * FROM hosts
+        const rows = db.prepare(`
+            SELECT ${selectFields} FROM hosts
             WHERE active = 1 AND ${chosen.col} IS NOT NULL
-            ORDER BY ${chosen.col} DESC
-            LIMIT ?
+            ORDER BY ${chosen.col} DESC LIMIT ?
         `).all(Math.min(parseInt(limit) || 20, 100));
+        const hosts = fields ? applyFields(rows, fields) : rows;
         res.json({ success: true, metric, label: chosen.label, count: hosts.length, hosts });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // POST /hosts/batch — bulk address lookup
 app.post('/hosts/batch', (req, res) => {
-    const { addresses } = req.body;
+    const { addresses, fields } = req.body;
     if (!Array.isArray(addresses) || !addresses.length) {
         return res.status(400).json({ success: false, error: 'Body must contain addresses array' });
     }
     const addrs = addresses.map(a => String(a).trim()).filter(Boolean).slice(0, 100);
+    const selectFields = parseFields(fields);
     try {
         const placeholders = addrs.map(() => '?').join(',');
-        const hosts = db.prepare(`SELECT * FROM hosts WHERE address IN (${placeholders})`).all(...addrs);
-        const map = Object.fromEntries(hosts.map(h => [h.address, h]));
+        const rows = db.prepare(`SELECT ${selectFields} FROM hosts WHERE address IN (${placeholders})`).all(...addrs);
+        const map = Object.fromEntries(rows.map(h => [h.address, h]));
         const results = addrs.map(a => map[a] || { address: a, found: false });
-        res.json({ success: true, requested: addrs.length, found: hosts.length, hosts: results });
+        res.json({ success: true, requested: addrs.length, found: rows.length, hosts: results });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /hosts/:address/history — heartbeat history
 app.get('/hosts/:address/history', (req, res) => {
     const { address } = req.params;
-    const { limit = 100 } = req.query;
+    const { limit = 100, offset = 0 } = req.query;
     try {
         const host = db.prepare('SELECT address, domain, active FROM hosts WHERE address = ?').get(address);
         if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
+        const intLimit  = Math.min(parseInt(limit) || 100, 500);
+        const intOffset = parseInt(offset) || 0;
+        const total   = db.prepare('SELECT COUNT(*) as count FROM host_history WHERE address = ?').get(address)?.count || 0;
         const history = db.prepare(`
             SELECT * FROM host_history WHERE address = ?
-            ORDER BY timestamp DESC LIMIT ?
-        `).all(address, Math.min(parseInt(limit) || 100, 500));
-        res.json({ success: true, address, domain: host.domain, count: history.length, history });
+            ORDER BY timestamp DESC LIMIT ? OFFSET ?
+        `).all(address, intLimit, intOffset);
+        res.json({ success: true, address, domain: host.domain, ...buildPagination(total, intLimit, intOffset), count: history.length, history });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /hosts/random — random sample
 app.get('/hosts/random', (req, res) => {
-    const { count = 10, minRep, minSlots, country, domain, active = 'true' } = req.query;
+    const { count = 10, minRep, minSlots, country, domain, active = 'true', fields } = req.query;
     const limit = Math.min(parseInt(count) || 10, 200);
     let where = [], params = [];
     if (active !== undefined)   { where.push('active = ?');               params.push(active === 'true' ? 1 : 0); }
@@ -503,19 +669,22 @@ app.get('/hosts/random', (req, res) => {
     if (country !== undefined)  { where.push('countryCode = ?');           params.push(country.toUpperCase()); }
     if (domain !== undefined)   { where.push('domain LIKE ?');             params.push('%' + domain + '%'); }
     const whereClause = where.length ? 'WHERE ' + where.join(' AND ') : '';
-    const sql = `SELECT * FROM hosts ${whereClause} ORDER BY RANDOM() LIMIT ?`;
+    const selectFields = parseFields(fields);
     params.push(limit);
     try {
-        const hosts = db.prepare(sql).all(...params);
+        const rows = db.prepare(`SELECT ${selectFields} FROM hosts ${whereClause} ORDER BY RANDOM() LIMIT ?`).all(...params);
+        const hosts = fields ? applyFields(rows, fields) : rows;
         res.json({ success: true, count: hosts.length, hosts });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /hosts/:address — single host
 app.get('/hosts/:address', (req, res) => {
-    const host = db.prepare('SELECT * FROM hosts WHERE address = ?').get(req.params.address);
+    const { fields } = req.query;
+    const selectFields = parseFields(fields);
+    const host = db.prepare(`SELECT ${selectFields} FROM hosts WHERE address = ?`).get(req.params.address);
     if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
-    res.json({ success: true, host });
+    res.json({ success: true, host: fields ? applyFields([host], fields)[0] : host });
 });
 
 // GET /versions
@@ -556,7 +725,8 @@ app.get('/stats', (req, res) => {
             AVG(CASE WHEN active=1 THEN xahBalance END) as avgXah,
             AVG(CASE WHEN active=1 THEN evrBalance END) as avgEvr,
             MIN(CASE WHEN active=1 AND leaseDrops > 0 THEN leaseDrops END) as minLeaseDrops,
-            MAX(CASE WHEN active=1 THEN leaseDrops END) as maxLeaseDrops
+            MAX(CASE WHEN active=1 THEN leaseDrops END) as maxLeaseDrops,
+            SUM(CASE WHEN active=1 AND description IS NOT NULL AND description != '' THEN 1 ELSE 0 END) as hostsWithDescription
         FROM hosts
     `).get();
     const countries = db.prepare(`
@@ -581,8 +751,8 @@ app.post('/scan', (req, res) => {
 
 // GET /health
 app.get('/health', (req, res) => {
-    const hostCount = db.prepare('SELECT COUNT(*) as count FROM hosts').get()?.count || 0;
-    const activeCount = db.prepare('SELECT COUNT(*) as count FROM hosts WHERE active=1').get()?.count || 0;
+    const hostCount    = db.prepare('SELECT COUNT(*) as count FROM hosts').get()?.count || 0;
+    const activeCount  = db.prepare('SELECT COUNT(*) as count FROM hosts WHERE active=1').get()?.count || 0;
     const historyCount = db.prepare('SELECT COUNT(*) as count FROM host_history').get()?.count || 0;
     res.json({ success: true, status: 'ok', version: VERSION, hostCount, activeCount, historyCount, lastFullScan: getMeta('lastFullScan'), scanInProgress });
 });
@@ -600,7 +770,7 @@ const main = async () => {
     await initEvernode();
     app.listen(API_PORT, () => { console.log(`[API] Listening on http://localhost:${API_PORT}`); });
     subscribeHeartbeat();
-    const lastScan = getMeta('lastFullScan');
+    const lastScan  = getMeta('lastFullScan');
     const hostCount = db.prepare('SELECT COUNT(*) as count FROM hosts').get()?.count || 0;
     if (!lastScan || hostCount === 0) {
         console.log('[API] No existing data — starting initial full scan...');
