@@ -6,6 +6,36 @@
 <title>Evernode Host API — Live Network Data</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+(function() {
+  const THEMES = {
+    fiordland: {
+      dark:  { '--bg':'#0D1B2A','--bg2':'#111F30','--bg3':'#172638','--bg4':'#1E2F42','--border':'#253648','--border2':'#2E4057','--text':'#F4F1E8','--text2':'#9AAFC2','--text3':'#5A7A96','--accent':'#1B6CA8','--accent2':'#48CAE4','--accent-bg':'rgba(72,202,228,0.10)','--accent-border':'rgba(72,202,228,0.28)','--cyan':'#48CAE4','--blue-light':'#3B8EC4','--slate':'#2E4057','--sand':'#F4F1E8','--green':'#4FC3A1','--green-bg':'rgba(79,195,161,0.10)','--amber':'#E8B84B' },
+      light: { '--bg':'#F0F6FB','--bg2':'#E4EFF7','--bg3':'#D0E4F0','--bg4':'#BDD7E9','--border':'#A8C8E0','--border2':'#8AB4CF','--text':'#0D1B2A','--text2':'#1B4A72','--text3':'#2E6A9E','--accent':'#1B6CA8','--accent2':'#1557A0','--accent-bg':'rgba(27,108,168,0.10)','--accent-border':'rgba(27,108,168,0.28)','--cyan':'#1557A0','--blue-light':'#1B6CA8','--slate':'#BDD7E9','--sand':'#0D1B2A','--green':'#0F6E56','--green-bg':'rgba(15,110,86,0.10)','--amber':'#B8710A' }
+    },
+    waitomo: {
+      dark:  { '--bg':'#050D12','--bg2':'#091419','--bg3':'#0E1E24','--bg4':'#162D35','--border':'#1A3A44','--border2':'#1E6B6B','--text':'#F0F8F5','--text2':'#7FFFD4','--text3':'#3DBFA0','--accent':'#1E6B6B','--accent2':'#7FFFD4','--accent-bg':'rgba(127,255,212,0.10)','--accent-border':'rgba(127,255,212,0.28)','--cyan':'#7FFFD4','--blue-light':'#3DBFA0','--slate':'#162D35','--sand':'#F0F8F5','--green':'#3DBFA0','--green-bg':'rgba(61,191,160,0.10)','--amber':'#E8C07A' },
+      light: { '--bg':'#F2FAF8','--bg3':'#C8EDE5','--bg2':'#E4F5F0','--bg4':'#A8DDD0','--border':'#A8DDD0','--border2':'#7DC4B5','--text':'#061A15','--text2':'#0F6E56','--text3':'#1D9E75','--accent':'#0F6E56','--accent2':'#085041','--accent-bg':'rgba(15,110,86,0.10)','--accent-border':'rgba(15,110,86,0.28)','--cyan':'#085041','--blue-light':'#0F6E56','--slate':'#C8EDE5','--sand':'#061A15','--green':'#0F6E56','--green-bg':'rgba(15,110,86,0.10)','--amber':'#7A5020' }
+    },
+    kauri: {
+      dark:  { '--bg':'#120E09','--bg2':'#1C1510','--bg3':'#2A1E14','--bg4':'#3D2C1A','--border':'#4A3520','--border2':'#7A5020','--text':'#F5EFE0','--text2':'#E8C07A','--text3':'#B8842A','--accent':'#7A5020','--accent2':'#E8C07A','--accent-bg':'rgba(232,192,122,0.10)','--accent-border':'rgba(232,192,122,0.28)','--cyan':'#E8C07A','--blue-light':'#B8842A','--slate':'#3D2C1A','--sand':'#F5EFE0','--green':'#B8842A','--green-bg':'rgba(184,132,42,0.10)','--amber':'#E8C07A' },
+      light: { '--bg':'#FAF6EC','--bg2':'#F5EFE0','--bg3':'#E8D9BC','--bg4':'#D9C49A','--border':'#D9C49A','--border2':'#C4A870','--text':'#2A1E14','--text2':'#7A5020','--text3':'#B8842A','--accent':'#7A5020','--accent2':'#3D2C1A','--accent-bg':'rgba(122,80,32,0.10)','--accent-border':'rgba(122,80,32,0.28)','--cyan':'#3D2C1A','--blue-light':'#7A5020','--slate':'#E8D9BC','--sand':'#2A1E14','--green':'#7A5020','--green-bg':'rgba(122,80,32,0.10)','--amber':'#B8842A' }
+    },
+    southernalps: {
+      dark:  { '--bg':'#0F1318','--bg2':'#141A21','--bg3':'#1B2430','--bg4':'#263646','--border':'#2E4057','--border2':'#3D5A75','--text':'#EDF2F5','--text2':'#B8CFDF','--text3':'#7A9BB5','--accent':'#3D5A75','--accent2':'#B8CFDF','--accent-bg':'rgba(184,207,223,0.10)','--accent-border':'rgba(184,207,223,0.28)','--cyan':'#B8CFDF','--blue-light':'#7A9BB5','--slate':'#263646','--sand':'#EDF2F5','--green':'#7A9BB5','--green-bg':'rgba(122,155,181,0.10)','--amber':'#C8A87A' },
+      light: { '--bg':'#F5F8FA','--bg2':'#EBF2F7','--bg3':'#D8E8F2','--bg4':'#BDD5E6','--border':'#BDD5E6','--border2':'#8AB4CF','--text':'#0F1318','--text2':'#263646','--text3':'#3D5A75','--accent':'#263646','--accent2':'#1B2430','--accent-bg':'rgba(38,54,70,0.10)','--accent-border':'rgba(38,54,70,0.28)','--cyan':'#1B2430','--blue-light':'#263646','--slate':'#D8E8F2','--sand':'#0F1318','--green':'#3D5A75','--green-bg':'rgba(61,90,117,0.10)','--amber':'#8A6A3A' }
+    }
+  };
+  const saved = JSON.parse(localStorage.getItem('theme') || '{"palette":"fiordland","mode":"dark"}');
+  const t = THEMES[saved.palette]?.[saved.mode] || THEMES.fiordland.dark;
+  const root = document.documentElement;
+  Object.entries(t).forEach(([k,v]) => root.style.setProperty(k, v));
+  root.dataset.palette = saved.palette;
+  root.dataset.mode = saved.mode;
+  window._THEMES = THEMES;
+  window._themeSaved = saved;
+})();
+</script>
 <style>
   :root {
     --bg:           #0D1B2A;
@@ -33,18 +63,44 @@
   html { scroll-behavior: smooth; }
   body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 15px; line-height: 1.6; overflow-x: hidden; }
 
-  nav { position: sticky; top: 0; z-index: 100; background: rgba(13,27,42,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; }
+  nav { position: sticky; top: 0; z-index: 100; background: var(--bg2); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; height: 60px; }
   .nav-logo { font-size: 0.95rem; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 0.75rem; color: var(--text); text-decoration: none; }
   .nav-logo-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-bg); border: 1px solid var(--accent-border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .nav-badge { background: var(--green-bg); color: var(--green); border: 1px solid rgba(79,195,161,0.25); padding: 2px 9px; font-size: 0.68rem; font-weight: 500; border-radius: 20px; font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; gap: 5px; }
   .live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-  .nav-links { display: flex; gap: 0.15rem; list-style: none; }
+  .nav-links { display: flex; gap: 0.15rem; list-style: none; align-items: center; }
   .nav-links a { font-size: 0.82rem; color: var(--text2); text-decoration: none; padding: 0.4rem 0.85rem; border-radius: 6px; transition: all 0.15s; }
   .nav-links a:hover { color: var(--text); background: var(--bg3); }
   .nav-right { display: flex; align-items: center; gap: 0.75rem; }
   .gh-link { font-size: 0.8rem; color: var(--text2); text-decoration: none; padding: 0.4rem 1rem; border: 1px solid var(--border2); border-radius: 6px; transition: all 0.15s; font-weight: 500; display: flex; align-items: center; gap: 6px; }
   .gh-link:hover { color: var(--text); background: var(--bg3); }
+
+  .palette-group { display: flex; align-items: center; gap: 4px; overflow: visible; position: relative; }
+  .palette-trigger { font-size: 0.78rem; color: var(--text2); padding: 0.35rem 0.7rem; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .palette-trigger:hover { color: var(--text); background: var(--bg3); }
+  .palette-trigger-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--cyan); flex-shrink: 0; }
+  .palette-trigger-arrow { font-size: 0.55rem; color: var(--text3); }
+  .mode-toggle-wrap { padding: 0.35rem 0.6rem; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .mode-toggle-wrap:hover { background: var(--bg3); }
+  .mode-icon { width: 12px; height: 12px; flex-shrink: 0; color: var(--text3); }
+  .mode-track { width: 28px; height: 15px; border-radius: 8px; background: var(--bg3); border: 1px solid var(--border2); position: relative; transition: background 0.2s; }
+  .mode-thumb { width: 11px; height: 11px; border-radius: 50%; background: var(--cyan); position: absolute; top: 1px; left: 1px; transition: transform 0.2s; }
+  .mode-thumb.on { transform: translateX(13px); }
+
+  .palette-dropdown { display: none; position: absolute; top: calc(100% + 6px); left: 0; min-width: 168px; background: var(--bg2); border: 1px solid var(--border2); border-radius: 8px; z-index: 200; overflow: hidden; }
+  .palette-dropdown.open { display: block; }
+  .palette-option { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--text2); transition: background 0.1s; }
+  .palette-option:last-child { border-bottom: none; }
+  .palette-option:hover { background: var(--bg3); color: var(--text); }
+  .palette-option.active { background: var(--bg3); color: var(--text); }
+  .palette-option-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; border: 2px solid transparent; }
+  .palette-option.active .palette-option-dot { border-color: var(--cyan); }
+
+  @media (max-width: 768px) {
+    .nav-links { display: none; }
+    .palette-group { display: none; }
+  }
 
   .hero-wrap { border-bottom: 1px solid var(--border); overflow: hidden; position: relative; }
   .hero-glow { position: absolute; top: -120px; right: -80px; width: 560px; height: 440px; border-radius: 50%; background: radial-gradient(ellipse, rgba(72,202,228,0.06) 0%, transparent 68%); pointer-events: none; }
@@ -52,10 +108,10 @@
   .hero-eyebrow { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.04em; color: var(--accent2); background: var(--accent-bg); border: 1px solid var(--accent-border); padding: 4px 12px; border-radius: 20px; margin-bottom: 1.5rem; }
   .hero h1 { font-size: clamp(2.2rem, 3.8vw, 3.3rem); font-weight: 600; line-height: 1.08; letter-spacing: -0.03em; margin-bottom: 1.25rem; color: var(--sand); }
   .hero h1 em { font-style: normal; color: var(--cyan); }
-  .hero p { color: var(--text2); font-size: 1rem; max-width: 460px; margin-bottom: 2rem; line-height: 1.75; }
+  .hero p { color: var(--text2); font-size: 1rem; margin-bottom: 2rem; line-height: 1.75; }
   .hero-cta { display: flex; gap: 0.75rem; flex-wrap: wrap; }
   .btn { font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; padding: 0.6rem 1.3rem; border-radius: 7px; text-decoration: none; cursor: pointer; transition: all 0.15s; border: none; display: inline-flex; align-items: center; gap: 6px; }
-  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary { background: var(--accent); color: var(--bg); }
   .btn-primary:hover { background: var(--blue-light); }
   .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
   .btn-secondary:hover { background: var(--bg4); }
@@ -79,7 +135,6 @@
   .section { max-width: 1160px; margin: 0 auto; padding: 4rem 2rem; border-bottom: 1px solid var(--border); }
   .section-label { font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.75rem; }
   .section h2 { font-weight: 600; font-size: 1.8rem; letter-spacing: -0.025em; margin-bottom: 1.75rem; color: var(--sand); }
-
   .section > p { max-width: 1160px; }
   .code-block { background: var(--bg2); border: 1px solid var(--border); color: var(--text2); font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; padding: 1.5rem; border-radius: 10px; overflow-x: auto; line-height: 1.85; display: block; width: 100%; }
   .code-block .comment { color: var(--text3); }
@@ -130,7 +185,6 @@
     .hero { grid-template-columns: 1fr; gap: 2.5rem; }
     .builder { grid-template-columns: 1fr; }
     .form-row { grid-template-columns: 1fr; }
-    .nav-links { display: none; }
   }
   .examples-grid { display: flex; flex-direction: column; gap: 1.5rem; }
   .example-block { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
@@ -154,8 +208,8 @@
   <a class="nav-logo" href="#">
     <div class="nav-logo-mark">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="8,2 14,5.5 14,10.5 8,14 2,10.5 2,5.5" fill="none" stroke="#48CAE4" stroke-width="1.5"/>
-        <circle cx="8" cy="8" r="2" fill="#48CAE4"/>
+        <polygon points="8,2 14,5.5 14,10.5 8,14 2,10.5 2,5.5" fill="none" stroke="var(--cyan)" stroke-width="1.5"/>
+        <circle cx="8" cy="8" r="2"  fill="var(--cyan)"/>
       </svg>
     </div>
     Evernode Host API
@@ -165,6 +219,40 @@
     <li><a href="#endpoints">Endpoints</a></li>
     <li><a href="#examples">Examples</a></li>
     <li><a href="#builder">Try It</a></li>
+    <li>
+      <div class="palette-group" id="palette-group">
+        <div class="palette-trigger" id="palette-trigger" onclick="togglePaletteDropdown(event)">
+          Palette
+          <div class="palette-trigger-dot" id="palette-trigger-dot"></div>
+          <span class="palette-trigger-arrow">&#9660;</span>
+        </div>
+        <div class="palette-dropdown" id="palette-dropdown">
+          <div class="palette-option" data-palette="fiordland" onclick="selectPalette('fiordland')">
+            NZ Fiordland <div class="palette-option-dot" style="background:#1B6CA8;"></div>
+          </div>
+          <div class="palette-option" data-palette="kauri" onclick="selectPalette('kauri')">
+            NZ Kauri <div class="palette-option-dot" style="background:#B8842A;"></div>
+          </div>
+          <div class="palette-option" data-palette="southernalps" onclick="selectPalette('southernalps')">
+            NZ Southern Alps <div class="palette-option-dot" style="background:#7A9BB5;"></div>
+          </div>
+          <div class="palette-option" data-palette="waitomo" onclick="selectPalette('waitomo')">
+            NZ Waitomo <div class="palette-option-dot" style="background:#1D9E75;"></div>
+          </div>
+        </div>
+        <div class="mode-toggle-wrap" onclick="toggleMode()" title="Toggle light/dark mode">
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          <div class="mode-track">
+            <div class="mode-thumb" id="mode-thumb"></div>
+          </div>
+          <svg class="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
+          </svg>
+        </div>
+      </div>
+    </li>
   </ul>
   <div class="nav-right">
     <div class="nav-badge"><div class="live-dot"></div>Live</div>
@@ -180,7 +268,7 @@
   <div class="hero">
     <div>
       <div class="hero-eyebrow">
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" stroke="#48CAE4" stroke-width="2" fill="none"/></svg>
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><polygon points="8,1 15,5 15,11 8,15 1,11 1,5" stroke="var(--cyan)" stroke-width="2" fill="none"/></svg>
         Evernode Network Data
       </div>
       <h1>Real-time host<br>discovery <em>API</em></h1>
@@ -875,6 +963,72 @@ console.log(history);</div>
 <script>
   const API = 'https://api.onledger.net';
 
+  // ── Theme system ──────────────────────────────────────────────
+  const PALETTE_DOTS = {
+    fiordland:   '#1B6CA8',
+    waitomo:     '#1D9E75',
+    kauri:       '#B8842A',
+    southernalps:'#7A9BB5'
+  };
+
+  function applyTheme(palette, mode) {
+    const t = window._THEMES[palette]?.[mode];
+    if (!t) return;
+    const root = document.documentElement;
+    Object.entries(t).forEach(([k,v]) => root.style.setProperty(k, v));
+    root.dataset.palette = palette;
+    root.dataset.mode = mode;
+    localStorage.setItem('theme', JSON.stringify({ palette, mode }));
+    // Update trigger dot colour
+    const dot = document.getElementById('palette-trigger-dot');
+    if (dot) dot.style.background = PALETTE_DOTS[palette] || 'var(--cyan)';
+    // Update toggle thumb position
+    const thumb = document.getElementById('mode-thumb');
+    if (thumb) thumb.classList.toggle('on', mode === 'light');
+    // Update active state in dropdown
+    document.querySelectorAll('.palette-option').forEach(el => {
+      el.classList.toggle('active', el.dataset.palette === palette);
+    });
+  }
+
+  function togglePaletteDropdown(e) {
+    e.stopPropagation();
+    document.getElementById('palette-dropdown').classList.toggle('open');
+  }
+
+  function selectPalette(palette) {
+    const mode = document.documentElement.dataset.mode || 'dark';
+    applyTheme(palette, mode);
+    document.getElementById('palette-dropdown').classList.remove('open');
+  }
+
+  function toggleMode() {
+    const current = document.documentElement.dataset.mode || 'dark';
+    const palette = document.documentElement.dataset.palette || 'fiordland';
+    applyTheme(palette, current === 'dark' ? 'light' : 'dark');
+  }
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    const dd = document.getElementById('palette-dropdown');
+    if (dd && !document.getElementById('palette-group').contains(e.target)) {
+      dd.classList.remove('open');
+    }
+  });
+
+  // Initialise UI state from saved theme
+  (function initThemeUI() {
+    const saved = window._themeSaved || { palette: 'fiordland', mode: 'dark' };
+    const dot = document.getElementById('palette-trigger-dot');
+    if (dot) dot.style.background = PALETTE_DOTS[saved.palette] || '#48CAE4';
+    const thumb = document.getElementById('mode-thumb');
+    if (thumb) thumb.classList.toggle('on', saved.mode === 'light');
+    document.querySelectorAll('.palette-option').forEach(el => {
+      el.classList.toggle('active', el.dataset.palette === saved.palette);
+    });
+  })();
+
+  // ── Stats & ticker ────────────────────────────────────────────
   async function loadStats() {
     try {
       const [health, stats] = await Promise.all([
