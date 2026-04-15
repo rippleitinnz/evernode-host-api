@@ -239,3 +239,7 @@ curl "https://api.onledger.net/stats"
 - Real-time updates via heartbeat subscription to the Xahau ledger
 - History snapshots accumulate from v1.2.0 onwards (max 500 per host)
 - The developer portal (`public/index.html`) is a single-file static site — no build step required
+
+## Theming
+
+The developer portal supports four NZ-themed colour palettes — Fiordland, Waitomo, Kauri and Southern Alps — each with a light and dark mode. The palette switcher is in the nav bar on tablet and desktop. The selected theme is saved to localStorage.
