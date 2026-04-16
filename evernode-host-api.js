@@ -464,7 +464,7 @@ const buildPagination = (total, limit, offset) => {
 app.get('/hosts', (req, res) => {
     const {
         active, minSlots, maxSlots, minRep, maxRep, includeUnscored,
-        minXah = '5', minEvr = '5', minLease, maxLease, country, domain,
+        minXah, minEvr, minLease, maxLease, country, domain,
         version, minRam, minDisk, isATransferer, reputedOnHeartbeat,
         minAccumulatedReward,
         // null/not-null filters
