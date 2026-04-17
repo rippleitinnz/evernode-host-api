@@ -132,7 +132,7 @@ const ALL_FIELDS = [
     'cpuMicrosec','ramMb','diskMb','email','accumulatedReward','xahBalance','evrBalance',
     'registrationTimestamp','lastHeartbeatIndex','description','uriTokenId','registrationLedger',
     'registrationFee','isATransferer','transferTimestamp','supportVoteSent','reputedOnHeartbeat',
-    'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated'
+    'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated','lastHeartbeatTime'
 ];
 
 const ALLOWED_SORT = [
@@ -306,7 +306,8 @@ const hostToRow = (info, balances = { xah: 0, evr: 0 }) => ({
     reputedOnHeartbeat:   info.reputedOnHeartbeat ? 1 : 0,
     lastVoteCandidateIdx: info.lastVoteCandidateIdx ?? null,
     lastVoteTimestamp:    info.lastVoteTimestamp || null,
-    lastUpdated:          Date.now()
+    lastUpdated:          Date.now(),
+    lastHeartbeatTime:    null
 });
 
 // ── Full scan ─────────────────────────────────────────────────
@@ -392,6 +393,7 @@ const updateHost = async (address) => {
         if (!info) return;
         const existing = db.prepare('SELECT xahBalance, evrBalance FROM hosts WHERE address = ?').get(address);
         const row = hostToRow(info, { xah: existing?.xahBalance || 0, evr: existing?.evrBalance || 0 });
+        row.lastHeartbeatTime = Date.now();
         upsertHost.run(row);
         insertHistory.run({
             address:            row.address,
@@ -506,6 +508,7 @@ app.get('/hosts', (req, res) => {
     if (isATransferer !== undefined)      { where.push('isATransferer = ?');                      params.push(parseInt(isATransferer)); }
     if (reputedOnHeartbeat !== undefined) { where.push('reputedOnHeartbeat = ?');                 params.push(reputedOnHeartbeat === 'true' || reputedOnHeartbeat === '1' ? 1 : 0); }
     if (minAccumulatedReward !== undefined) { where.push('CAST(accumulatedReward AS REAL) >= ?'); params.push(parseFloat(minAccumulatedReward)); }
+    if (req.query.minLastHeartbeat !== undefined) { where.push('lastHeartbeatTime >= ?'); params.push(Date.now() - (parseInt(req.query.minLastHeartbeat) * 60000)); }
 
     // null / not-null filters
     if (hasDescription === 'true')  { where.push("description IS NOT NULL AND description != ''"); }
