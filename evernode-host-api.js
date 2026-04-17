@@ -241,8 +241,8 @@ const upsertHost = db.prepare(`
         address, active, domain, countryCode, maxInstances, activeInstances,
         availableInstances, leaseAmount, leaseDrops, hostReputation, version,
         cpuModelName, cpuCount, cpuMHz, cpuMicrosec, ramMb, diskMb, email,
+        reputedOnHeartbeat, lastVoteCandidateIdx, lastVoteTimestamp, lastUpdated, lastHeartbeatTime
         accumulatedReward, xahBalance, evrBalance, registrationTimestamp,
-        lastHeartbeatIndex, description, uriTokenId, registrationLedger,
         registrationFee, isATransferer, transferTimestamp, supportVoteSent,
         reputedOnHeartbeat, lastVoteCandidateIdx, lastVoteTimestamp, lastUpdated
     ) VALUES (
@@ -252,7 +252,7 @@ const upsertHost = db.prepare(`
         @accumulatedReward, @xahBalance, @evrBalance, @registrationTimestamp,
         @lastHeartbeatIndex, @description, @uriTokenId, @registrationLedger,
         @registrationFee, @isATransferer, @transferTimestamp, @supportVoteSent,
-        @reputedOnHeartbeat, @lastVoteCandidateIdx, @lastVoteTimestamp, @lastUpdated
+        @reputedOnHeartbeat, @lastVoteCandidateIdx, @lastVoteTimestamp, @lastUpdated, @lastHeartbeatTime
     )
 `);
 
