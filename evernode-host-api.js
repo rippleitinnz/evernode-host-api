@@ -98,7 +98,10 @@ db.exec(`
         reputedOnHeartbeat INTEGER,
         lastVoteCandidateIdx INTEGER,
         lastVoteTimestamp INTEGER,
-        lastUpdated INTEGER
+        lastUpdated INTEGER,
+        reported INTEGER DEFAULT 0,
+        reportedAt INTEGER,
+        reportReason TEXT
     );
     CREATE TABLE IF NOT EXISTS meta (
         key TEXT PRIMARY KEY,
@@ -132,7 +135,8 @@ const ALL_FIELDS = [
     'cpuMicrosec','ramMb','diskMb','email','accumulatedReward','xahBalance','evrBalance',
     'registrationTimestamp','lastHeartbeatIndex','description','uriTokenId','registrationLedger',
     'registrationFee','isATransferer','transferTimestamp','supportVoteSent','reputedOnHeartbeat',
-    'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated','lastHeartbeatTime'
+    'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated','lastHeartbeatTime',
+    'reported','reportedAt','reportReason'
 ];
 
 const ALLOWED_SORT = [
@@ -484,6 +488,8 @@ app.get('/hosts', (req, res) => {
     let where = [], params = [];
 
     if (active !== undefined)             { where.push('active = ?');                             params.push(active === 'true' || active === '1' ? 1 : 0); }
+    // Exclude reported hosts unless explicitly requested
+    if (req.query.includeReported !== 'true') { where.push('(reported = 0 OR reported IS NULL OR reportedAt < ?)'); params.push(Date.now() - (7 * 24 * 60 * 60 * 1000)); }
     if (minSlots !== undefined)           { where.push('availableInstances >= ?');                params.push(parseInt(minSlots)); }
     if (maxSlots !== undefined)           { where.push('availableInstances <= ?');                params.push(parseInt(maxSlots)); }
     if (minRep !== undefined) {
@@ -678,6 +684,20 @@ app.get('/hosts/random', (req, res) => {
         const rows = db.prepare(`SELECT ${selectFields} FROM hosts ${whereClause} ORDER BY RANDOM() LIMIT ?`).all(...params);
         const hosts = fields ? applyFields(rows, fields) : rows;
         res.json({ success: true, count: hosts.length, hosts });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// POST /hosts/:address/report — report a dead/broken host
+app.post('/hosts/:address/report', (req, res) => {
+    const { address } = req.params;
+    const { reason } = req.body || {};
+    try {
+        const host = db.prepare('SELECT address, domain FROM hosts WHERE address = ?').get(address);
+        if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
+        db.prepare('UPDATE hosts SET reported = 1, reportedAt = ?, reportReason = ? WHERE address = ?')
+          .run(Date.now(), reason || null, address);
+        console.log(`[Report] Host reported: ${address} | domain: ${host.domain} | reason: ${reason || 'none'}`);
+        res.json({ success: true, message: `Host ${address} reported and excluded from searches for 7 days.` });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
