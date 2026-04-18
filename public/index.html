@@ -1139,6 +1139,7 @@ console.log(history);</div>
 
   let _lastData = null;
   let _lastOffset = 0;
+  let _lastBaseParams = null;
 
   async function runQuery(overrideOffset) {
     const params = new URLSearchParams({ active: 'true' });
@@ -1170,6 +1171,8 @@ console.log(history);</div>
       const data = await fetch(API + '/hosts?' + params.toString()).then(r => r.json());
       _lastData   = convertTimestamps(data.hosts || []);
       _lastOffset = data.nextOffset;
+      _lastBaseParams = new URLSearchParams(params.toString());
+      _lastBaseParams.delete('offset');
       count.textContent = `${_lastData.length} of ${data.total} matching`;
       body.innerHTML = highlight(JSON.stringify({ ...data, hosts: _lastData }, null, 2));
       if (_lastData.length) {
@@ -1186,20 +1189,55 @@ console.log(history);</div>
     if (_lastOffset !== null && _lastOffset !== undefined) runQuery(_lastOffset);
   }
 
-  function downloadJSON() {
+  async function fetchAllPages() {
+    if (!_lastBaseParams) return null;
+    const count = document.getElementById('result-count');
+    const orig = count.textContent;
+    const params = new URLSearchParams(_lastBaseParams.toString());
+    params.set('limit', '500');
+    params.delete('offset');
+    let all = [], offset = 0, hasMore = true;
+    while (hasMore) {
+      params.set('offset', offset);
+      count.textContent = 'Fetching... ' + all.length + ' records so far';
+      const data = await fetch(API + '/hosts?' + params.toString()).then(r => r.json());
+      const page = convertTimestamps(data.hosts || []);
+      all = all.concat(page);
+      hasMore = data.hasMore && data.nextOffset !== null;
+      offset = data.nextOffset;
+    }
+    count.textContent = orig;
+    return all;
+  }
+
+  async function downloadJSON() {
     if (!_lastData) return;
-    const blob = new Blob([JSON.stringify(_lastData, null, 2)], { type: 'application/json' });
+    const btn = document.getElementById('dl-json');
+    btn.textContent = 'Fetching...';
+    btn.disabled = true;
+    const all = await fetchAllPages();
+    btn.textContent = '↓ JSON';
+    btn.disabled = false;
+    if (!all) return;
+    const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
     a.download = 'evernode-hosts.json'; a.click();
   }
 
-  function downloadCSV() {
+  async function downloadCSV() {
     if (!_lastData || !_lastData.length) return;
-    const keys = Object.keys(_lastData[0]);
-    const rows = [keys.join(','), ..._lastData.map(h =>
+    const btn = document.getElementById('dl-csv');
+    btn.textContent = 'Fetching...';
+    btn.disabled = true;
+    const all = await fetchAllPages();
+    btn.textContent = '↓ CSV';
+    btn.disabled = false;
+    if (!all || !all.length) return;
+    const keys = Object.keys(all[0]);
+    const rows = [keys.join(','), ...all.map(h =>
       keys.map(k => {
         const v = h[k] == null ? '' : String(h[k]);
-        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"` : v;
+        return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g,'""')}"`  : v;
       }).join(',')
     )];
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
