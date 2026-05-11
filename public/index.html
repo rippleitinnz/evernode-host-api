@@ -185,6 +185,7 @@
     .hero { grid-template-columns: 1fr; gap: 2.5rem; }
     .builder { grid-template-columns: 1fr; }
     .form-row { grid-template-columns: 1fr; }
+    #hero-report-btn { display: none !important; }
   }
   .examples-grid { display: flex; flex-direction: column; gap: 1.5rem; }
   .example-block { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
@@ -200,6 +201,27 @@
   .info-tip { display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; border-radius:50%; background:var(--bg4); border:1px solid var(--border2); color:var(--text3); font-size:0.6rem; cursor:default; position:relative; font-family:'JetBrains Mono',monospace; font-style:normal; }
   .info-tip::after { content:attr(data-tip); display:none; position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%); width:220px; background:var(--bg4); border:1px solid var(--border2); color:var(--text2); font-size:0.72rem; line-height:1.5; padding:8px 10px; border-radius:6px; font-family:'Inter',sans-serif; font-weight:400; text-transform:none; letter-spacing:0; z-index:10; pointer-events:none; }
   .info-tip:hover::after { display:block; }
+
+  /* ── Report modal ── */
+  .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); backdrop-filter:blur(4px); z-index:500; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; }
+  .modal { background:var(--bg2); border:1px solid var(--border2); border-radius:12px; padding:2rem; width:min(480px,92vw); max-height:90vh; overflow-y:auto; }
+  .modal h3 { font-size:1.1rem; font-weight:600; color:var(--sand); margin-bottom:0.35rem; }
+  .modal-addr { font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--text3); margin-bottom:1.5rem; word-break:break-all; }
+  .modal .form-group { margin-bottom:1rem; }
+  .modal .form-group label { font-family:'JetBrains Mono',monospace; font-size:0.65rem; color:var(--text3); text-transform:uppercase; letter-spacing:0.07em; display:block; margin-bottom:0.35rem; }
+  .modal .form-group select, .modal .form-group textarea { width:100%; font-family:'JetBrains Mono',monospace; font-size:0.82rem; padding:0.55rem 0.75rem; border:1px solid var(--border2); border-radius:6px; background:var(--bg3); color:var(--text); outline:none; transition:border-color 0.15s; resize:vertical; }
+  .modal .form-group select:focus, .modal .form-group textarea:focus { border-color:var(--cyan); }
+  .modal .form-group select option { background:var(--bg3); }
+  .modal-note { font-size:0.78rem; color:var(--text3); line-height:1.6; margin-bottom:1.25rem; padding:0.75rem; background:var(--bg3); border-radius:6px; border-left:3px solid var(--border2); }
+  .modal-actions { display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1.5rem; }
+  .modal-result { margin-top:1rem; padding:0.75rem; border-radius:6px; font-size:0.83rem; display:none; }
+  .modal-result.ok  { background:var(--green-bg); color:var(--green); border:1px solid rgba(79,195,161,0.25); }
+  .modal-result.err { background:rgba(220,80,80,0.10); color:#E07070; border:1px solid rgba(220,80,80,0.25); }
+
+  /* ── Flagged badge ── */
+  .flag-badge { display:inline-flex; align-items:center; gap:4px; font-family:'JetBrains Mono',monospace; font-size:0.68rem; font-weight:500; padding:2px 8px; border-radius:4px; background:rgba(220,80,80,0.12); color:#E07070; border:1px solid rgba(220,80,80,0.25); }
+  .method.del { background:rgba(220,80,80,0.12); color:#E07070; border:1px solid rgba(220,80,80,0.25); }
 </style>
 </head>
 <body>
@@ -276,6 +298,7 @@
       <div class="hero-cta">
         <a href="#builder" class="btn btn-primary">Try the API</a>
         <a href="#endpoints" class="btn btn-secondary">View endpoints</a>
+        <a href="#reports" class="btn btn-secondary" style="border-color:rgba(220,80,80,0.4);color:#E07070;display:inline-flex;" id="hero-report-btn">&#9873; Report a host</a>
       </div>
     </div>
     <div class="stats-panel">
@@ -296,8 +319,17 @@
 
 <!-- 01 QUICK START -->
 <div class="section" id="quickstart">
-  <div class="section-label">01 — Quick Start</div>
-  <h2>Start querying in seconds</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('quickstart-body','quickstart-toggle-label','quickstart-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">01 — Quick Start</div>
+      <h2 style="margin-bottom:0;">Start querying in seconds</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="quickstart-toggle-label">Expand</span>
+      <span id="quickstart-toggle-icon">&#9660;</span>
+    </div>
+  </div>
+  <div id="quickstart-body" style="display:none;margin-top:1.5rem;">
   <p style="color:var(--text2);margin-bottom:1.5rem;line-height:1.75;">No authentication required. All endpoints return JSON. CORS enabled for browser requests.</p>
   <div class="code-block"><span class="comment"># Active hosts with reputation and available slots</span>
 curl "<span class="url">https://api.onledger.net/hosts?active=true&minRep=200&minSlots=1&limit=10</span>"
@@ -323,7 +355,28 @@ curl -X POST "<span class="url">https://api.onledger.net/hosts/batch</span>" \
 curl "<span class="url">https://api.onledger.net/hosts/rnpkkEEMDSYAg1G6eHWF66kKjrKoAqMbtV/history</span>"
 
 <span class="comment"># Network statistics</span>
-curl "<span class="url">https://api.onledger.net/stats</span>"</div>
+curl "<span class="url">https://api.onledger.net/stats</span>"
+
+<span class="comment"># Provider centralisation breakdown with HHI score</span>
+curl "<span class="url">https://api.onledger.net/providers</span>"
+
+<span class="comment"># Filter hosts by provider (partial match)</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&asnOrg=OVH&minRep=200</span>"
+
+<span class="comment"># Report a problematic host</span>
+curl -X POST "<span class="url">https://api.onledger.net/hosts/rXXX/report</span>" \
+  -H "Content-Type: application/json" \
+  -d '{"category":"peer_port_broken","reason":"Peer port 22861 not responding despite reputation 252"}'
+
+<span class="comment"># View all flagged hosts</span>
+curl "<span class="url">https://api.onledger.net/hosts/flagged</span>"
+
+<span class="comment"># View reports for a specific host</span>
+curl "<span class="url">https://api.onledger.net/hosts/rXXX/reports</span>"
+
+<span class="comment"># Filter by hosting type (cloud, dedicated, vps, residential, unknown)</span>
+curl "<span class="url">https://api.onledger.net/hosts?active=true&hostingType=dedicated&minRep=200</span>"</div>
+  </div>
 </div>
 
 <!-- 02 ENDPOINTS -->
@@ -367,6 +420,9 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
           <tr><td>hasEmail</td><td>boolean</td><td>—</td><td>true=only hosts with an email set, false=only hosts without</td></tr>
           <tr><td>hasDomain</td><td>boolean</td><td>—</td><td>true=only hosts with a domain set, false=only hosts without</td></tr>
           <tr><td>description_like</td><td>string</td><td>—</td><td>Partial match on description field</td></tr>
+          <tr><td>hostingType</td><td>string</td><td>—</td><td>cloud, dedicated, vps, residential, unknown</td></tr>
+          <tr><td>asnOrg</td><td>string</td><td>—</td><td>Partial match on ASN organisation name e.g. OVH, Hetzner, Contabo</td></tr>
+          <tr><td>includeFlagged</td><td>boolean</td><td>false</td><td>Include flagged/reported hosts in results</td></tr>
           <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated list of fields to return e.g. address,domain,hostReputation</td></tr>
           <tr><td>sort</td><td>string</td><td>—</td><td>Shorthand sort e.g. sort=hostReputation:desc (alternative to sortBy + sortDir)</td></tr>
           <tr><td>sortBy</td><td>string</td><td>hostReputation</td><td>hostReputation, availableInstances, leaseDrops, xahBalance, evrBalance, ramMb, diskMb, lastHeartbeatIndex, registrationTimestamp, accumulatedReward, lastUpdated</td></tr>
@@ -477,6 +533,53 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
 
     <div class="endpoint">
       <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method post">POST</span><span class="endpoint-path">/hosts/:address/report</span><span class="endpoint-desc">Report a problematic host</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Submit a community report for a host. Reports are scored by severity and contribute to a host's <code style="color:var(--cyan);">reportScore</code>. When the score reaches 3, the host is automatically flagged and excluded from default results. One report per IP per host per 24 hours. Body must be JSON.</p>
+        <table class="params-table">
+          <tr><th>Body field</th><th>Type</th><th>Required</th><th>Description</th></tr>
+          <tr><td>category</td><td>string</td><td>yes</td><td>peer_port_broken (1), instance_unreachable (1), slow_provision (1), bad_peering (2), fake_specs (2), security_issue (3), other (1) — number is severity weight</td></tr>
+          <tr><td>reason</td><td>string</td><td>yes</td><td>Description of the issue (min 10 chars, max 500)</td></tr>
+          <tr><td>evidence</td><td>string</td><td>no</td><td>URL, tx hash, or log excerpt (max 1000 chars)</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/:address/reports</span><span class="endpoint-desc">View reports for a host</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all community reports submitted for a specific host, along with the current <code style="color:var(--cyan);">reportScore</code>, <code style="color:var(--cyan);">flagged</code> status, and the score threshold required for flagging. Reporter IPs are not exposed.</p>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/hosts/flagged</span><span class="endpoint-desc">All flagged hosts</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all hosts that have been flagged — either by community reports reaching the score threshold, or directly by an admin. Ordered by report score descending.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
+          <tr><td>limit / offset</td><td>integer</td><td>100 / 0</td><td>Pagination</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/report-categories</span><span class="endpoint-desc">Valid report categories</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns the list of valid report categories, their severity weights, the score threshold for auto-flagging, and the rolling window in days. Use this to populate submission forms.</p>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
         <span class="method get">GET</span><span class="endpoint-path">/hosts/random</span><span class="endpoint-desc">Random host sample</span>
       </div>
       <div class="endpoint-body">
@@ -490,6 +593,20 @@ curl "<span class="url">https://api.onledger.net/stats</span>"</div>
           <tr><td>active</td><td>boolean</td><td>true</td><td>Filter by active status</td></tr>
           <tr><td>fields</td><td>string</td><td>—</td><td>Comma-separated fields to return</td></tr>
         </table>
+      </div>
+    </div>
+
+    <div class="endpoint">
+      <div class="endpoint-header" onclick="toggle(this)">
+        <span class="method get">GET</span><span class="endpoint-path">/providers</span><span class="endpoint-desc">Provider breakdown &amp; centralisation</span>
+      </div>
+      <div class="endpoint-body">
+        <p style="margin-bottom:1rem;color:var(--text2);font-size:0.88rem;line-height:1.7;">Returns all ASN providers with host counts, available slots, average reputation, share of active hosts, and flagged host count. Also returns a hosting-type breakdown and an HHI (Herfindahl-Hirschman Index) concentration score. Requires the GeoLite2-ASN database to be loaded — unenriched hosts are excluded.</p>
+        <table class="params-table">
+          <tr><th>Parameter</th><th>Type</th><th>Default</th><th>Description</th></tr>
+          <tr><td>active</td><td>boolean</td><td>true</td><td>Set to false to include inactive hosts in counts</td></tr>
+        </table>
+        <p style="margin-top:1rem;color:var(--text2);font-size:0.83rem;line-height:1.7;">HHI interpretation: below 1,500 = competitive · 1,500–2,500 = moderately concentrated · above 2,500 = highly concentrated.</p>
       </div>
     </div>
 
@@ -787,21 +904,58 @@ console.log(history);</div>
 
 <!-- 04 BUILDER -->
 <div class="section" id="builder">
-  <div class="section-label">04 — Try It</div>
-  <h2>Live query builder</h2>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('builder-body','builder-toggle-label','builder-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">04 — Try It</div>
+      <h2 style="margin-bottom:0;">Live query builder</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="builder-toggle-label">Collapse</span>
+      <span id="builder-toggle-icon">&#9650;</span>
+    </div>
+  </div>
+  <div id="builder-body" style="display:block;margin-top:1.5rem;">
   <p style="color:var(--text2);margin-bottom:2rem;line-height:1.75;">Build a query and see the live response directly from the API. For advanced filtering see the full endpoint reference above.</p>
   <div class="builder">
     <div class="builder-form">
       <div class="form-row">
         <div class="form-group">
-          <label style="display:flex;align-items:center;gap:5px;">Min Reputation
-            <span class="info-tip" data-tip="Reputation is scored 0–255 by the Evernode reputation contract, which deploys test contracts to each host and measures performance. Higher is better. 200+ is a solid threshold — 240+ is the top tier.">?</span>
+          <label style="display:flex;align-items:center;gap:5px;">Hosting Type
+            <span class="info-tip" data-tip="Derived from the host's IP ASN. Cloud = hyperscalers (AWS, GCP, DO). Dedicated = OVH, Hetzner, Leaseweb. VPS = Contabo, Hostinger. Residential = home ISPs.">?</span>
           </label>
-          <input type="number" id="q-minRep" value="200" min="0" max="255">
+          <select id="q-hostingType">
+            <option value="">Any</option>
+            <option value="cloud">Cloud</option>
+            <option value="dedicated">Dedicated</option>
+            <option value="vps">VPS</option>
+            <option value="residential">Residential</option>
+            <option value="unknown">Unknown</option>
+          </select>
         </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;justify-content:space-between;gap:4px;">
+            <span style="display:flex;align-items:center;gap:5px;">Provider
+              <span class="info-tip" data-tip="Filter by ASN organisation name. Use the Include/Exclude toggle to either show only hosts from a provider or exclude them entirely — useful for avoiding over-represented providers.">?</span>
+            </span>
+            <span id="provider-mode-wrap" style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none;flex-shrink:0;" onclick="toggleProviderMode()">
+              <span id="provider-mode-label" style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;">incl</span>
+              <div class="mode-track" style="width:28px;height:15px;">
+                <div class="mode-thumb" id="provider-mode-thumb"></div>
+              </div>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em;">excl</span>
+            </span>
+          </label>
+          <select id="q-asnOrg"><option value="">Any provider</option></select>
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label>Min Available Instances</label>
           <input type="number" id="q-minSlots" value="1" min="1">
+        </div>
+        <div class="form-group">
+          <label>Min Reputation</label>
+          <input type="number" id="q-minRep" value="200" min="0" max="255">
         </div>
       </div>
       <div class="form-row">
@@ -878,11 +1032,22 @@ console.log(history);</div>
           </select>
         </div>
       </div>
-      <div class="form-group">
-        <label style="display:flex;align-items:center;gap:5px;">Include unscored (rep=0)
-          <span class="info-tip" data-tip="Hosts with a reputation of 0 have not yet been tested by the reputation contract, or failed testing. Excluded by default.">?</span>
-        </label>
-        <select id="q-unscored"><option value="">No</option><option value="true">Yes</option></select>
+      <div class="form-row">
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Include flagged hosts
+            <span class="info-tip" data-tip="Flagged hosts are excluded from results by default. They have been reported by the community or directly by an admin for issues like broken ports, security vulnerabilities, or fake specs.">?</span>
+          </label>
+          <select id="q-includeFlagged">
+            <option value="">No — exclude flagged</option>
+            <option value="true">Yes — include flagged</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:5px;">Include unscored (rep=0)
+            <span class="info-tip" data-tip="Hosts with a reputation of 0 have not yet been tested by the reputation contract, or failed testing. Excluded by default.">?</span>
+          </label>
+          <select id="q-unscored"><option value="">No</option><option value="true">Yes</option></select>
+        </div>
       </div>
       <button class="btn btn-primary" onclick="runQuery()" style="width:100%;justify-content:center;padding:0.7rem;">Run query</button>
     </div>
@@ -892,6 +1057,7 @@ console.log(history);</div>
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <span class="result-count" id="result-count"></span>
           <button class="dl-btn" id="dl-next" onclick="loadNextPage()" style="display:none">&#8594; Next page</button>
+          <button class="dl-btn" id="dl-report" onclick="promptReport()" style="display:none;color:#E07070;border-color:rgba(220,80,80,0.4);">&#9873; Report host</button>
           <button class="dl-btn" id="dl-json" onclick="downloadJSON()" style="display:none">&#8595; JSON</button>
           <button class="dl-btn" id="dl-csv" onclick="downloadCSV()" style="display:none">&#8595; CSV</button>
         </div>
@@ -899,12 +1065,22 @@ console.log(history);</div>
       <div class="result-body" id="result-body">Click "Run query" to see live results...</div>
     </div>
   </div>
+  </div>
 </div>
 
 <!-- 05 DATA FIELDS -->
-<div class="section">
-  <div class="section-label">05 — Data Fields</div>
-  <h2>Host object</h2>
+<div class="section" id="datafields">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('datafields-body','datafields-toggle-label','datafields-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">05 — Data Fields</div>
+      <h2 style="margin-bottom:0;">Host object</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="datafields-toggle-label">Expand</span>
+      <span id="datafields-toggle-icon">&#9660;</span>
+    </div>
+  </div>
+  <div id="datafields-body" style="display:none;margin-top:1.5rem;">
   <p style="color:var(--text2);margin-bottom:1.5rem;line-height:1.75;">Every host object returned by the API contains the following fields. Use the <code style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:var(--cyan);background:var(--bg3);padding:2px 6px;border-radius:4px;">fields</code> parameter on any endpoint to limit which fields are returned.</p>
   <div class="code-block" style="line-height:1.95">{
   <span class="key">"address"</span>:               <span class="val">"rXXX..."</span>          <span class="comment">// XRPL address</span>
@@ -941,6 +1117,14 @@ console.log(history);</div>
   <span class="key">"lastVoteTimestamp"</span>:     <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last governance vote (may be null)</span>
   <span class="key">"lastHeartbeatIndex"</span>:    <span class="val">1775699062</span>         <span class="comment">// unix timestamp of last heartbeat</span>
   <span class="key">"lastUpdated"</span>:           <span class="val">1775701701966</span>      <span class="comment">// last DB update (ms)</span>
+  <span class="key">"asnNumber"</span>:             <span class="val">16509</span>              <span class="comment">// autonomous system number (null if ASN DB not loaded)</span>
+  <span class="key">"asnOrg"</span>:                <span class="val">"OVH SAS"</span>          <span class="comment">// ASN organisation name</span>
+  <span class="key">"hostingType"</span>:           <span class="val">"dedicated"</span>        <span class="comment">// cloud | dedicated | vps | residential | unknown</span>
+  <span class="key">"flagged"</span>:               <span class="val">0</span>                  <span class="comment">// 1=flagged, excluded from default results</span>
+  <span class="key">"flaggedAt"</span>:             <span class="val">null</span>               <span class="comment">// timestamp when flagged (ms)</span>
+  <span class="key">"flagReason"</span>:            <span class="val">null</span>               <span class="comment">// reason set by admin (if admin-flagged)</span>
+  <span class="key">"reportCount"</span>:           <span class="val">0</span>                  <span class="comment">// number of community reports in last 90 days</span>
+  <span class="key">"reportScore"</span>:           <span class="val">0</span>                  <span class="comment">// cumulative severity score (≥3 triggers auto-flag)</span>
 }
 
 <span class="comment">// List responses also include pagination metadata:</span>
@@ -953,12 +1137,124 @@ console.log(history);</div>
   <span class="key">"prevOffset"</span>: <span class="val">null</span>   <span class="comment">// pass as offset for previous page (null if first page)</span>
   <span class="key">"hosts"</span>:      [...]  <span class="comment">// array of host objects</span>
 }</div>
+  </div>
+</div>
+
+<!-- 06 PROVIDERS -->
+<div class="section" id="providers">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('providers-body','providers-toggle-label','providers-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">06 — Providers</div>
+      <h2 style="margin-bottom:0;">Network centralisation</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="providers-toggle-label">Expand</span>
+      <span id="providers-toggle-icon">&#9660;</span>
+    </div>
+  </div>
+  <div id="providers-body" style="display:none;margin-top:1.5rem;">
+    <p style="color:var(--text2);margin-bottom:2rem;line-height:1.75;">Host distribution by infrastructure provider, derived from IP→ASN lookup. Useful for assessing decentralisation risk — a network where one provider hosts the majority of nodes is vulnerable to that provider's outages, policy changes, or legal pressures.</p>
+    <div id="providers-data" style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:0.8rem;">Loading provider data...</div>
+  </div>
+</div>
+
+<!-- 07 COMMUNITY REPORTS -->
+<div class="section" id="reports">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;cursor:pointer;" onclick="toggleSection('reports-body','reports-toggle-label','reports-toggle-icon')">
+    <div>
+      <div class="section-label" style="margin-bottom:0.5rem;">07 — Community Reports</div>
+      <h2 style="margin-bottom:0;">Report a host</h2>
+    </div>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;color:var(--text3);display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0.85rem;border:1px solid var(--border);border-radius:6px;">
+      <span id="reports-toggle-label">Expand</span>
+      <span id="reports-toggle-icon">&#9660;</span>
+    </div>
+  </div>
+  <div id="reports-body" style="display:none;margin-top:1.5rem;">
+    <p style="color:var(--text2);margin-bottom:2rem;line-height:1.75;">Help the community by reporting hosts with broken ports, fake specs, security issues, or other problems. Reports are scored by severity — a cumulative score of 3 or more excludes the host from default search results. One report per IP per host per 24 hours.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;align-items:start;">
+
+      <!-- Report form -->
+      <div>
+        <div class="section-label" style="margin-bottom:1rem;">Submit a report</div>
+        <div style="display:flex;flex-direction:column;gap:0.85rem;">
+          <div class="form-group">
+            <label>Host XRPL address</label>
+            <input type="text" id="report-address" placeholder="rXXX..." style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;padding:0.55rem 0.75rem;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);outline:none;width:100%;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor=''">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <select id="report-section-category" style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;padding:0.55rem 0.75rem;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);outline:none;width:100%;">
+              <option value="peer_port_broken">Peer port broken — severity 1</option>
+              <option value="instance_unreachable">Instance unreachable — severity 1</option>
+              <option value="slow_provision">Slow provision — severity 1</option>
+              <option value="bad_peering">Bad peering — severity 2</option>
+              <option value="fake_specs">Fake specs — severity 2</option>
+              <option value="security_issue">Security issue — severity 3</option>
+              <option value="other">Other — severity 1</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Reason <span style="color:var(--text3);font-size:0.6rem;text-transform:none;">(min 10 chars)</span></label>
+            <textarea id="report-section-reason" rows="3" maxlength="500" placeholder="Describe the issue..." style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;padding:0.55rem 0.75rem;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);outline:none;width:100%;resize:vertical;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor=''"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Evidence <span style="color:var(--text3);font-size:0.6rem;text-transform:none;">(optional)</span></label>
+            <textarea id="report-section-evidence" rows="2" maxlength="1000" placeholder="URL, tx hash, or log excerpt..." style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;padding:0.55rem 0.75rem;border:1px solid var(--border2);border-radius:6px;background:var(--bg3);color:var(--text);outline:none;width:100%;resize:vertical;transition:border-color 0.15s;" onfocus="this.style.borderColor='var(--cyan)'" onblur="this.style.borderColor=''"></textarea>
+          </div>
+          <div id="report-section-result" style="display:none;padding:0.75rem;border-radius:6px;font-size:0.83rem;"></div>
+          <button class="btn btn-primary" id="report-section-btn" onclick="submitSectionReport()" style="justify-content:center;">Submit report</button>
+        </div>
+      </div>
+
+      <!-- Flagged hosts -->
+      <div>
+        <div class="section-label" style="margin-bottom:1rem;">Currently flagged hosts</div>
+        <div id="flagged-list" style="color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:0.78rem;">Loading...</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <footer style="text-align:center;flex-direction:column;gap:0.5rem;">
   <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3);">Updated every 6 hours + real-time heartbeats</div>
   <div style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3);">Elephant Tools &middot; &copy; onledger.net 2026 &middot; Data via Xahau and Evernode</div>
 </footer>
+
+<!-- Report modal -->
+<div class="modal-overlay" id="report-modal" onclick="closeReportModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>Report a host</h3>
+    <div class="modal-addr" id="report-modal-addr"></div>
+    <div class="modal-note">Reports are public and contribute to a host's score. A score ≥ 3 excludes the host from default results. One report per IP per host per 24 hours.</div>
+    <div class="form-group">
+      <label>Category</label>
+      <select id="report-category">
+        <option value="peer_port_broken">Peer port broken — passes reputation but peer port fails</option>
+        <option value="instance_unreachable">Instance unreachable — acquired instance never came up</option>
+        <option value="slow_provision">Slow provision — excessive time to provision</option>
+        <option value="bad_peering">Bad peering — weakly connected / INTERNAL_SECURITY=mid</option>
+        <option value="fake_specs">Fake specs — advertised RAM/CPU doesn't match reality</option>
+        <option value="security_issue">Security issue — known vulnerability (severity 3)</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Reason <span style="color:var(--text3);font-size:0.6rem;">(min 10 chars)</span></label>
+      <textarea id="report-reason" rows="3" maxlength="500" placeholder="Describe the issue..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Evidence <span style="color:var(--text3);font-size:0.6rem;">(optional — URL, tx hash, log excerpt)</span></label>
+      <textarea id="report-evidence" rows="2" maxlength="1000" placeholder="https://... or paste relevant output"></textarea>
+    </div>
+    <div class="modal-result" id="report-result"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeReportModal()">Cancel</button>
+      <button class="btn btn-primary" id="report-submit-btn" onclick="submitReport()">Submit report</button>
+    </div>
+  </div>
+</div>
 
 <script>
   const API = 'https://api.onledger.net';
@@ -1096,21 +1392,107 @@ console.log(history);</div>
     } catch(e) { console.warn('Could not load versions:', e.message); }
   }
 
+  async function loadProviders() {
+    const el = document.getElementById('providers-data');
+    try {
+      const data = await fetch(API + '/providers').then(r => r.json());
+
+      // Populate provider dropdown (3+ active hosts only)
+      const sel = document.getElementById('q-asnOrg');
+      const dropProviders = (data.providers || []).filter(p => p.active >= 3);
+      dropProviders.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.asnOrg;
+        opt.textContent = `${p.asnOrg} (${p.active} active — ${p.shareOfActive}%)`;
+        sel.appendChild(opt);
+      });
+
+      if (!el) return;
+
+      if (!data.providers || data.providers.length === 0) {
+        el.innerHTML = '<span style="color:var(--text3);">No provider data yet — ASN enrichment runs on the next full scan.</span>';
+        return;
+      }
+
+      const hhi = data.hhi || 0;
+      const hhiColour = hhi < 1500 ? 'var(--green)' : hhi < 2500 ? 'var(--amber)' : '#E07070';
+      let html = `
+        <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-bottom:2rem;">
+          <div class="stat-item" style="flex:1;min-width:160px;">
+            <div class="stat-value" style="color:${hhiColour};font-size:1.4rem;">${hhi.toLocaleString()}</div>
+            <div class="stat-label">HHI Score</div>
+          </div>
+          <div class="stat-item" style="flex:1;min-width:160px;">
+            <div class="stat-value" style="color:${hhiColour};font-size:1.4rem;">${data.hhiRating || '—'}</div>
+            <div class="stat-label">Concentration</div>
+          </div>
+          <div class="stat-item" style="flex:1;min-width:160px;">
+            <div class="stat-value" style="font-size:1.4rem;">${data.providers.length}</div>
+            <div class="stat-label">Unique providers</div>
+          </div>
+          <div class="stat-item" style="flex:1;min-width:160px;">
+            <div class="stat-value" style="font-size:1.4rem;">${(data.unenrichedActive || 0).toLocaleString()}</div>
+            <div class="stat-label">Unenriched hosts</div>
+          </div>
+        </div>`;
+
+      // Hosting type breakdown
+      if (data.byType && data.byType.length) {
+        html += `<div style="margin-bottom:1.5rem;">
+          <div class="section-label" style="margin-bottom:0.75rem;">By type</div>
+          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">`;
+        data.byType.forEach(t => {
+          html += `<div class="stat-item" style="flex:1;min-width:130px;">
+            <div class="stat-value cyan" style="font-size:1.2rem;">${t.shareOfActive}%</div>
+            <div class="stat-label">${t.hostingType || 'unknown'}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--text3);margin-top:0.25rem;">${t.active} active</div>
+          </div>`;
+        });
+        html += `</div></div>`;
+      }
+
+      // Provider table
+      html += `<div class="section-label" style="margin-bottom:0.75rem;">By provider</div>
+        <div style="overflow-x:auto;">
+        <table class="params-table" style="width:100%;">
+          <tr>
+            <th>Provider</th><th>Type</th><th>Active</th><th>Share</th>
+            <th>Slots avail</th><th>Avg rep</th><th>Flagged</th>
+          </tr>`;
+      data.providers.forEach(p => {
+        const share = p.shareOfActive || 0;
+        const shareBar = `<div style="display:inline-block;width:${Math.min(share*2,100)}px;height:4px;background:var(--accent2);border-radius:2px;vertical-align:middle;margin-right:6px;opacity:0.7;"></div>`;
+        const flagCell = p.flaggedCount > 0
+          ? `<span class="flag-badge">&#9873; ${p.flaggedCount}</span>`
+          : `<span style="color:var(--text3);font-size:0.75rem;">—</span>`;
+        html += `<tr>
+          <td style="color:var(--text);font-weight:500;">${p.asnOrg || '—'}</td>
+          <td><span style="font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3);">${p.hostingType || '—'}</span></td>
+          <td style="color:var(--cyan);">${p.active}</td>
+          <td>${shareBar}<span style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;">${share}%</span></td>
+          <td style="color:var(--text2);">${p.availableSlots || 0}</td>
+          <td style="color:var(--text2);">${p.avgReputation || '—'}</td>
+          <td>${flagCell}</td>
+        </tr>`;
+      });
+      html += `</table></div>
+        <div style="margin-top:1rem;font-size:0.78rem;color:var(--text3);line-height:1.6;">
+          HHI (Herfindahl-Hirschman Index) measures market concentration based on active host share per provider.
+          Below 1,500 = competitive · 1,500–2,500 = moderate · Above 2,500 = concentrated.
+          ASN data populates on each 6-hour scan — unenriched hosts are excluded from these calculations.
+        </div>`;
+      el.innerHTML = html;
+    } catch(e) {
+      console.error('loadProviders error:', e);
+      if (el) el.innerHTML = `<span style="color:#E07070;font-family:'JetBrains Mono',monospace;font-size:0.78rem;">Error loading provider data: ${e.message}</span>`;
+    }
+  }
+
   function switchTab(btn, prefix, lang) {
     btn.closest('.lang-tabs').querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll(`[id^="${prefix}-"]`).forEach(el => el.style.display = 'none');
     document.getElementById(`${prefix}-${lang}`).style.display = 'block';
-  }
-
-  function toggleSection(bodyId, labelId, iconId) {
-    const body = document.getElementById(bodyId);
-    const label = document.getElementById(labelId);
-    const icon = document.getElementById(iconId);
-    const collapsed = body.style.display === 'none';
-    body.style.display = collapsed ? 'block' : 'none';
-    label.textContent = collapsed ? 'Collapse' : 'Expand';
-    icon.innerHTML = collapsed ? '&#9650;' : '&#9660;';
   }
 
   function toggle(header) { header.nextElementSibling.classList.toggle('open'); }
@@ -1157,6 +1539,15 @@ console.log(history);</div>
     if (hasDescription) params.set('hasDescription', hasDescription);
     const descriptionLike = document.getElementById('q-descriptionLike').value.trim();
     if (descriptionLike) params.set('description_like', descriptionLike);
+    const hostingType = document.getElementById('q-hostingType').value;
+    if (hostingType) params.set('hostingType', hostingType);
+    const asnOrg = document.getElementById('q-asnOrg').value;
+    if (asnOrg) {
+      if (_providerExclude) params.set('excludeAsnOrg', asnOrg);
+      else params.set('asnOrg', asnOrg);
+    }
+    const includeFlagged = document.getElementById('q-includeFlagged').value;
+    if (includeFlagged) params.set('includeFlagged', includeFlagged);
     if (overrideOffset !== undefined) params.set('offset', overrideOffset);
 
     const body  = document.getElementById('result-body');
@@ -1178,6 +1569,13 @@ console.log(history);</div>
       if (_lastData.length) {
         document.getElementById('dl-json').style.display = 'inline-block';
         document.getElementById('dl-csv').style.display  = 'inline-block';
+        // Show report button when a single host address is queried
+        const reportBtn = document.getElementById('dl-report');
+        if (_lastData.length === 1 && _lastData[0].address) {
+          reportBtn.style.display = 'inline-block';
+        } else {
+          reportBtn.style.display = 'none';
+        }
       }
       if (data.hasMore && data.nextOffset !== null) {
         document.getElementById('dl-next').style.display = 'inline-block';
@@ -1245,9 +1643,198 @@ console.log(history);</div>
     a.download = 'evernode-hosts.csv'; a.click();
   }
 
+  let _providerExclude = false;
+
+  function toggleProviderMode() {
+    _providerExclude = !_providerExclude;
+    const thumb = document.getElementById('provider-mode-thumb');
+    const label = document.getElementById('provider-mode-label');
+    const sel   = document.getElementById('q-asnOrg');
+    if (_providerExclude) {
+      thumb.classList.add('on');
+      label.style.color = '#E07070';
+      sel.style.borderColor = 'rgba(220,80,80,0.5)';
+      sel.style.color = '#E07070';
+      document.getElementById('provider-mode-wrap').title = 'Currently: Exclude selected provider';
+    } else {
+      thumb.classList.remove('on');
+      label.style.color = 'var(--text3)';
+      sel.style.borderColor = '';
+      sel.style.color = '';
+      document.getElementById('provider-mode-wrap').title = 'Currently: Include selected provider';
+    }
+  }
+
+  function promptReport() {
+    if (_lastData && _lastData.length === 1 && _lastData[0].address) {
+      openReportModal(_lastData[0].address);
+    }
+  }
+
+  // ── Report modal ──────────────────────────────────────────────
+  let _reportAddress = null;
+
+  function openReportModal(address) {
+    _reportAddress = address;
+    document.getElementById('report-modal-addr').textContent = address;
+    document.getElementById('report-category').value = 'peer_port_broken';
+    document.getElementById('report-reason').value = '';
+    document.getElementById('report-evidence').value = '';
+    const result = document.getElementById('report-result');
+    result.style.display = 'none';
+    result.className = 'modal-result';
+    document.getElementById('report-submit-btn').disabled = false;
+    document.getElementById('report-submit-btn').textContent = 'Submit report';
+    document.getElementById('report-modal').classList.add('open');
+  }
+
+  function closeReportModal(e) {
+    if (e && e.target !== document.getElementById('report-modal')) return;
+    document.getElementById('report-modal').classList.remove('open');
+    _reportAddress = null;
+  }
+
+  async function submitReport() {
+    if (!_reportAddress) return;
+    const category = document.getElementById('report-category').value;
+    const reason   = document.getElementById('report-reason').value.trim();
+    const evidence = document.getElementById('report-evidence').value.trim();
+    const result   = document.getElementById('report-result');
+    const btn      = document.getElementById('report-submit-btn');
+    if (reason.length < 10) {
+      result.textContent = 'Reason must be at least 10 characters.';
+      result.className = 'modal-result err';
+      result.style.display = 'block';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    try {
+      const res = await fetch(`${API}/hosts/${_reportAddress}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, reason, evidence: evidence || undefined })
+      });
+      const data = await res.json();
+      if (data.success) {
+        result.textContent = data.message;
+        result.className = 'modal-result ok';
+        btn.textContent = 'Submitted ✓';
+      } else {
+        result.textContent = data.error || 'Submission failed.';
+        result.className = 'modal-result err';
+        btn.disabled = false;
+        btn.textContent = 'Submit report';
+      }
+      result.style.display = 'block';
+    } catch(e) {
+      result.textContent = 'Network error: ' + e.message;
+      result.className = 'modal-result err';
+      result.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit report';
+    }
+  }
+
+  async function submitSectionReport() {
+    const address  = document.getElementById('report-address').value.trim();
+    const category = document.getElementById('report-section-category').value;
+    const reason   = document.getElementById('report-section-reason').value.trim();
+    const evidence = document.getElementById('report-section-evidence').value.trim();
+    const result   = document.getElementById('report-section-result');
+    const btn      = document.getElementById('report-section-btn');
+
+    if (!address) {
+      result.textContent = 'Please enter a host XRPL address.';
+      result.style.cssText = 'display:block;padding:0.75rem;border-radius:6px;font-size:0.83rem;background:rgba(220,80,80,0.10);color:#E07070;border:1px solid rgba(220,80,80,0.25);';
+      return;
+    }
+    if (reason.length < 10) {
+      result.textContent = 'Reason must be at least 10 characters.';
+      result.style.cssText = 'display:block;padding:0.75rem;border-radius:6px;font-size:0.83rem;background:rgba(220,80,80,0.10);color:#E07070;border:1px solid rgba(220,80,80,0.25);';
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+    result.style.display = 'none';
+    try {
+      const res = await fetch(`${API}/hosts/${address}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, reason, evidence: evidence || undefined })
+      });
+      const data = await res.json();
+      if (data.success) {
+        result.textContent = data.message;
+        result.style.cssText = 'display:block;padding:0.75rem;border-radius:6px;font-size:0.83rem;background:var(--green-bg);color:var(--green);border:1px solid rgba(79,195,161,0.25);';
+        btn.textContent = 'Submitted ✓';
+        document.getElementById('report-address').value = '';
+        document.getElementById('report-section-reason').value = '';
+        document.getElementById('report-section-evidence').value = '';
+        loadFlaggedHosts(); // refresh the flagged list
+      } else {
+        result.textContent = data.error || 'Submission failed.';
+        result.style.cssText = 'display:block;padding:0.75rem;border-radius:6px;font-size:0.83rem;background:rgba(220,80,80,0.10);color:#E07070;border:1px solid rgba(220,80,80,0.25);';
+        btn.disabled = false;
+        btn.textContent = 'Submit report';
+      }
+    } catch(e) {
+      result.textContent = 'Network error: ' + e.message;
+      result.style.cssText = 'display:block;padding:0.75rem;border-radius:6px;font-size:0.83rem;background:rgba(220,80,80,0.10);color:#E07070;border:1px solid rgba(220,80,80,0.25);';
+      btn.disabled = false;
+      btn.textContent = 'Submit report';
+    }
+  }
+
+  async function loadFlaggedHosts() {
+    const el = document.getElementById('flagged-list');
+    if (!el) return;
+    try {
+      const data = await fetch(`${API}/hosts/flagged?limit=50&fields=address,domain,reportScore,reportCount,flaggedAt,flagReason`).then(r => r.json());
+      if (!data.hosts || data.hosts.length === 0) {
+        el.innerHTML = '<span style="color:var(--text3);">No flagged hosts at this time.</span>';
+        return;
+      }
+      let html = `<table class="params-table" style="width:100%;">
+        <tr><th>Host</th><th>Score</th><th>Reports</th><th>Flagged</th></tr>`;
+      data.hosts.forEach(h => {
+        const domain = h.domain || h.address.slice(0, 12) + '…';
+        const when = h.flaggedAt ? new Date(h.flaggedAt).toISOString().slice(0,10) : '—';
+        const reason = h.flagReason ? `<div style="font-size:0.7rem;color:var(--text3);margin-top:2px;">${h.flagReason.slice(0,60)}${h.flagReason.length>60?'…':''}</div>` : '';
+        html += `<tr>
+          <td style="color:var(--text);">
+            <div style="font-weight:500;">${domain}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--text3);">${h.address.slice(0,16)}…</div>
+            ${reason}
+          </td>
+          <td><span class="flag-badge">&#9873; ${h.reportScore || '—'}</span></td>
+          <td style="color:var(--text2);">${h.reportCount || 0}</td>
+          <td style="color:var(--text3);font-size:0.75rem;">${when}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+      if (data.total > 50) html += `<div style="margin-top:0.75rem;font-size:0.72rem;color:var(--text3);">${data.total} flagged hosts total — showing 50 most recent.</div>`;
+      el.innerHTML = html;
+    } catch(e) {
+      el.innerHTML = `<span style="color:#E07070;font-size:0.78rem;">Could not load flagged hosts: ${e.message}</span>`;
+    }
+  }
+
+  function toggleSection(bodyId, labelId, iconId) {
+    const body = document.getElementById(bodyId);
+    const label = document.getElementById(labelId);
+    const icon = document.getElementById(iconId);
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? 'block' : 'none';
+    label.textContent = collapsed ? 'Collapse' : 'Expand';
+    icon.innerHTML = collapsed ? '&#9650;' : '&#9660;';
+    if (bodyId === 'reports-body' && collapsed) loadFlaggedHosts();
+  }
+
   loadStats();
   loadCountries();
   loadVersions();
+  loadProviders();
 </script>
 </body>
 </html>

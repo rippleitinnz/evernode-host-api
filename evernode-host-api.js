@@ -15,7 +15,7 @@ const Database = require('better-sqlite3');
 const express  = require('express');
 
 // ── Config ────────────────────────────────────────────────────
-const VERSION           = '1.4.0';
+const VERSION           = '1.5.1';
 const XAHAU_WS          = process.env.XAHAU_WS        || 'ws://localhost:6008';
 const API_PORT          = parseInt(process.env.API_PORT || '3001');
 const HEARTBEAT_ACCOUNT = 'rHktfGUbjqzU4GsYCMc1pDjdHXb5CJamto';
@@ -27,6 +27,8 @@ const BATCH_DELAY_MS    = 100;
 const DB_PATH           = path.join(__dirname, 'hosts.db');
 const EVDEVKIT_PATH     = '/root/.nvm/versions/node/v22.16.0/lib/node_modules/evdevkit/node_modules';
 const HISTORY_MAX_ROWS  = 500;
+const ASN_DB_PATH       = process.env.ASN_DB_PATH   || path.join(__dirname, 'GeoLite2-ASN.mmdb');
+const ADMIN_TOKEN       = process.env.ADMIN_TOKEN   || null; // required for /admin/* endpoints
 
 // ── Rate limiting ─────────────────────────────────────────────
 const rateLimitMap = new Map();
@@ -101,7 +103,15 @@ db.exec(`
         lastUpdated INTEGER,
         reported INTEGER DEFAULT 0,
         reportedAt INTEGER,
-        reportReason TEXT
+        reportReason TEXT,
+        flagged INTEGER DEFAULT 0,
+        flaggedAt INTEGER,
+        flagReason TEXT,
+        reportCount INTEGER DEFAULT 0,
+        reportScore INTEGER DEFAULT 0,
+        asnNumber INTEGER,
+        asnOrg TEXT,
+        hostingType TEXT
     );
     CREATE TABLE IF NOT EXISTS meta (
         key TEXT PRIMARY KEY,
@@ -121,12 +131,171 @@ db.exec(`
         leaseDrops INTEGER,
         accumulatedReward TEXT
     );
+    CREATE TABLE IF NOT EXISTS host_reports (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        address     TEXT NOT NULL,
+        reportedAt  INTEGER NOT NULL,
+        reporterIp  TEXT,
+        category    TEXT NOT NULL,
+        reason      TEXT,
+        evidence    TEXT,
+        severity    INTEGER NOT NULL DEFAULT 1
+    );
     CREATE INDEX IF NOT EXISTS idx_host_history_address ON host_history(address);
     CREATE INDEX IF NOT EXISTS idx_host_history_timestamp ON host_history(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_host_reports_address ON host_reports(address);
+    CREATE INDEX IF NOT EXISTS idx_host_reports_reportedAt ON host_reports(reportedAt);
 `);
+
+// Non-destructive migration: add new columns to hosts if upgrading from older schema.
+const migrateColumns = [
+    ['flagged',     'INTEGER DEFAULT 0'],
+    ['flaggedAt',   'INTEGER'],
+    ['flagReason',  'TEXT'],
+    ['reportCount', 'INTEGER DEFAULT 0'],
+    ['reportScore', 'INTEGER DEFAULT 0'],
+    ['asnNumber',   'INTEGER'],
+    ['asnOrg',      'TEXT'],
+    ['hostingType', 'TEXT'],
+];
+const existingCols = new Set(db.prepare('PRAGMA table_info(hosts)').all().map(r => r.name));
+for (const [col, def] of migrateColumns) {
+    if (!existingCols.has(col)) {
+        db.exec(`ALTER TABLE hosts ADD COLUMN ${col} ${def}`);
+        console.log(`[DB] Migrated: added column hosts.${col}`);
+    }
+}
 
 const setMeta = db.prepare('INSERT OR REPLACE INTO meta (key,value) VALUES (?,?)');
 const getMeta = (key) => { const r = db.prepare('SELECT value FROM meta WHERE key=?').get(key); return r?.value; };
+
+// ── ASN / hosting-type lookup ─────────────────────────────────
+// Requires GeoLite2-ASN.mmdb from MaxMind (free registration).
+// Download: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+// Set ASN_DB_PATH env var or place GeoLite2-ASN.mmdb alongside this file.
+let asnReader = null;
+const initAsn = async () => {
+    try {
+        const maxmind = require('maxmind');
+        if (require('fs').existsSync(ASN_DB_PATH)) {
+            asnReader = await maxmind.open(ASN_DB_PATH);
+            console.log(`[ASN] GeoLite2-ASN database loaded: ${ASN_DB_PATH}`);
+        } else {
+            console.log(`[ASN] GeoLite2-ASN.mmdb not found at ${ASN_DB_PATH} — ASN enrichment disabled.`);
+            console.log(`[ASN] Download from https://dev.maxmind.com/geoip/geolite2-free-geolocation-data`);
+        }
+    } catch {
+        console.log('[ASN] maxmind package not installed — ASN enrichment disabled. Run: npm install maxmind');
+    }
+};
+
+// Map ASN org name to a hosting-type classification.
+// Expand this table as new providers appear on the network.
+const classifyHostingType = (org) => {
+    if (!org) return 'unknown';
+    const o = org.toLowerCase();
+    // Cloud hyperscalers
+    if (/amazon|aws/.test(o))                           return 'cloud';
+    if (/google|gcp/.test(o))                           return 'cloud';
+    if (/microsoft|azure/.test(o))                      return 'cloud';
+    if (/alibaba/.test(o))                              return 'cloud';
+    if (/oracle cloud/.test(o))                         return 'cloud';
+    if (/digitalocean/.test(o))                         return 'cloud';
+    if (/linode|akamai/.test(o))                        return 'cloud';
+    if (/vultr/.test(o))                                return 'cloud';
+    if (/upcloud/.test(o))                              return 'cloud';
+    if (/exoscale/.test(o))                             return 'cloud';
+    // Dedicated / VPS providers common on Evernode
+    if (/ovh/.test(o))                                  return 'dedicated';
+    if (/hetzner/.test(o))                              return 'dedicated';
+    if (/contabo/.test(o))                              return 'vps';
+    if (/hostinger/.test(o))                            return 'vps';
+    if (/ionos|1&1/.test(o))                            return 'dedicated';
+    if (/leaseweb/.test(o))                             return 'dedicated';
+    if (/serverius/.test(o))                            return 'dedicated';
+    if (/hostdare/.test(o))                             return 'vps';
+    if (/racknerd/.test(o))                             return 'vps';
+    if (/buyvm|frantech/.test(o))                       return 'vps';
+    if (/bv-dc|datacamp|netcup|nocix|psychz/.test(o))  return 'dedicated';
+    if (/quadranet/.test(o))                            return 'dedicated';
+    // Residential / home ISPs
+    if (/spark new zealand|vodafone nz/.test(o))        return 'residential';
+    if (/comcast|charter|cox|at&t|verizon/.test(o))     return 'residential';
+    if (/bt group|virgin media|sky broadband/.test(o))  return 'residential';
+    if (/telstra|optus/.test(o))                        return 'residential';
+    if (/singtel|starhub/.test(o))                      return 'residential';
+    // Hosting / colo that doesn't fit above
+    if (/colocation|datacenter|data center|colo|hosting/.test(o)) return 'dedicated';
+    return 'unknown';
+};
+
+const lookupAsn = (ip) => {
+    if (!asnReader || !ip) return { asnNumber: null, asnOrg: null, hostingType: 'unknown' };
+    try {
+        const result = asnReader.get(ip);
+        if (!result) return { asnNumber: null, asnOrg: null, hostingType: 'unknown' };
+        const org  = result.autonomous_system_organization || null;
+        return {
+            asnNumber:   result.autonomous_system_number || null,
+            asnOrg:      org,
+            hostingType: classifyHostingType(org),
+        };
+    } catch { return { asnNumber: null, asnOrg: null, hostingType: 'unknown' }; }
+};
+
+// Resolve the IP address behind a domain (needed for ASN lookup when host uses a domain).
+const dns = require('dns').promises;
+const domainIpCache = new Map(); // domain -> { ip, expiry }
+const resolveIp = async (domainOrIp) => {
+    if (!domainOrIp) return null;
+    // Already an IP address?
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(domainOrIp)) return domainOrIp;
+    const cached = domainIpCache.get(domainOrIp);
+    if (cached && cached.expiry > Date.now()) return cached.ip;
+    try {
+        const addrs = await dns.resolve4(domainOrIp);
+        const ip = addrs[0] || null;
+        domainIpCache.set(domainOrIp, { ip, expiry: Date.now() + 3600000 }); // 1h cache
+        return ip;
+    } catch { return null; }
+};
+
+// ── Report helpers ────────────────────────────────────────────
+// Valid report categories and their severity weights.
+const REPORT_CATEGORIES = {
+    peer_port_broken:    1,
+    instance_unreachable:1,
+    slow_provision:      1,
+    bad_peering:         2,
+    fake_specs:          2,
+    security_issue:      3,
+    other:               1,
+};
+const REPORT_SCORE_FLAG_THRESHOLD = 3;  // cumulative severity before host is auto-flagged
+const REPORT_WINDOW_MS = 90 * 24 * 3600 * 1000; // 90 days
+
+const insertReport = db.prepare(`
+    INSERT INTO host_reports (address, reportedAt, reporterIp, category, reason, evidence, severity)
+    VALUES (@address, @reportedAt, @reporterIp, @category, @reason, @evidence, @severity)
+`);
+
+// Recompute reportCount + reportScore for an address and update hosts row.
+// Called after every new report.
+const refreshReportSummary = db.transaction((address) => {
+    const cutoff = Date.now() - REPORT_WINDOW_MS;
+    const { count, score } = db.prepare(`
+        SELECT COUNT(*) as count, COALESCE(SUM(severity), 0) as score
+        FROM host_reports WHERE address = ? AND reportedAt >= ?
+    `).get(address, cutoff);
+    const shouldFlag = score >= REPORT_SCORE_FLAG_THRESHOLD;
+    db.prepare(`
+        UPDATE hosts SET reportCount = ?, reportScore = ?,
+            flagged = CASE WHEN ? THEN 1 ELSE flagged END,
+            flaggedAt = CASE WHEN ? AND flagged = 0 THEN ? ELSE flaggedAt END
+        WHERE address = ?
+    `).run(count, score, shouldFlag ? 1 : 0, shouldFlag ? 1 : 0, shouldFlag ? 1 : 0, Date.now(), address);
+    return { count, score, flagged: shouldFlag };
+});
 
 // ── Allowed fields & sort ─────────────────────────────────────
 const ALL_FIELDS = [
@@ -136,7 +305,9 @@ const ALL_FIELDS = [
     'registrationTimestamp','lastHeartbeatIndex','description','uriTokenId','registrationLedger',
     'registrationFee','isATransferer','transferTimestamp','supportVoteSent','reputedOnHeartbeat',
     'lastVoteCandidateIdx','lastVoteTimestamp','lastUpdated','lastHeartbeatTime',
-    'reported','reportedAt','reportReason'
+    'reported','reportedAt','reportReason',
+    'flagged','flaggedAt','flagReason','reportCount','reportScore',
+    'asnNumber','asnOrg','hostingType'
 ];
 
 const ALLOWED_SORT = [
@@ -241,14 +412,15 @@ const fetchHostInfo = async (address) => {
 
 // ── Upsert host to DB ─────────────────────────────────────────
 const upsertHost = db.prepare(`
-    INSERT OR REPLACE INTO hosts (
+    INSERT INTO hosts (
         address, active, domain, countryCode, maxInstances, activeInstances,
         availableInstances, leaseAmount, leaseDrops, hostReputation, version,
         cpuModelName, cpuCount, cpuMHz, cpuMicrosec, ramMb, diskMb, email,
         accumulatedReward, xahBalance, evrBalance, registrationTimestamp,
         lastHeartbeatIndex, description, uriTokenId, registrationLedger,
         registrationFee, isATransferer, transferTimestamp, supportVoteSent,
-        reputedOnHeartbeat, lastVoteCandidateIdx, lastVoteTimestamp, lastUpdated, lastHeartbeatTime
+        reputedOnHeartbeat, lastVoteCandidateIdx, lastVoteTimestamp, lastUpdated, lastHeartbeatTime,
+        asnNumber, asnOrg, hostingType
     ) VALUES (
         @address, @active, @domain, @countryCode, @maxInstances, @activeInstances,
         @availableInstances, @leaseAmount, @leaseDrops, @hostReputation, @version,
@@ -256,8 +428,30 @@ const upsertHost = db.prepare(`
         @accumulatedReward, @xahBalance, @evrBalance, @registrationTimestamp,
         @lastHeartbeatIndex, @description, @uriTokenId, @registrationLedger,
         @registrationFee, @isATransferer, @transferTimestamp, @supportVoteSent,
-        @reputedOnHeartbeat, @lastVoteCandidateIdx, @lastVoteTimestamp, @lastUpdated, @lastHeartbeatTime
+        @reputedOnHeartbeat, @lastVoteCandidateIdx, @lastVoteTimestamp, @lastUpdated, @lastHeartbeatTime,
+        @asnNumber, @asnOrg, @hostingType
     )
+    ON CONFLICT(address) DO UPDATE SET
+        active=excluded.active, domain=excluded.domain, countryCode=excluded.countryCode,
+        maxInstances=excluded.maxInstances, activeInstances=excluded.activeInstances,
+        availableInstances=excluded.availableInstances, leaseAmount=excluded.leaseAmount,
+        leaseDrops=excluded.leaseDrops, hostReputation=excluded.hostReputation,
+        version=excluded.version, cpuModelName=excluded.cpuModelName, cpuCount=excluded.cpuCount,
+        cpuMHz=excluded.cpuMHz, cpuMicrosec=excluded.cpuMicrosec, ramMb=excluded.ramMb,
+        diskMb=excluded.diskMb, email=excluded.email, accumulatedReward=excluded.accumulatedReward,
+        xahBalance=excluded.xahBalance, evrBalance=excluded.evrBalance,
+        registrationTimestamp=excluded.registrationTimestamp,
+        lastHeartbeatIndex=excluded.lastHeartbeatIndex, description=excluded.description,
+        uriTokenId=excluded.uriTokenId, registrationLedger=excluded.registrationLedger,
+        registrationFee=excluded.registrationFee, isATransferer=excluded.isATransferer,
+        transferTimestamp=excluded.transferTimestamp, supportVoteSent=excluded.supportVoteSent,
+        reputedOnHeartbeat=excluded.reputedOnHeartbeat,
+        lastVoteCandidateIdx=excluded.lastVoteCandidateIdx,
+        lastVoteTimestamp=excluded.lastVoteTimestamp, lastUpdated=excluded.lastUpdated,
+        lastHeartbeatTime=COALESCE(excluded.lastHeartbeatTime, hosts.lastHeartbeatTime),
+        asnNumber=COALESCE(excluded.asnNumber, hosts.asnNumber),
+        asnOrg=COALESCE(excluded.asnOrg, hosts.asnOrg),
+        hostingType=COALESCE(excluded.hostingType, hosts.hostingType)
 `);
 
 const insertHistory = db.prepare(`
@@ -276,7 +470,7 @@ const pruneHistory = db.prepare(`
     )
 `);
 
-const hostToRow = (info, balances = { xah: 0, evr: 0 }) => ({
+const hostToRow = (info, balances = { xah: 0, evr: 0 }, asn = {}) => ({
     address:              info.address,
     active:               info.active ? 1 : 0,
     domain:               info.domain || null,
@@ -311,7 +505,10 @@ const hostToRow = (info, balances = { xah: 0, evr: 0 }) => ({
     lastVoteCandidateIdx: info.lastVoteCandidateIdx ?? null,
     lastVoteTimestamp:    info.lastVoteTimestamp || null,
     lastUpdated:          Date.now(),
-    lastHeartbeatTime:    null
+    lastHeartbeatTime:    null,
+    asnNumber:            asn.asnNumber  || null,
+    asnOrg:               asn.asnOrg     || null,
+    hostingType:          asn.hostingType|| null,
 });
 
 // ── Full scan ─────────────────────────────────────────────────
@@ -371,8 +568,18 @@ const fullScan = async () => {
             const infos = await Promise.all(batch.map(addr => fetchHostInfo(addr)));
             const activeInBatch = infos.filter(info => info?.active).map(info => info.address);
             const balances = activeInBatch.length > 0 ? await fetchBalances(activeInBatch) : {};
+            // ASN enrichment: resolve domain → IP → ASN for each host in batch
+            const asnMap = {};
+            if (asnReader) {
+                await Promise.all(infos.filter(Boolean).map(async info => {
+                    const ip = await resolveIp(info.domain || null);
+                    asnMap[info.address] = lookupAsn(ip);
+                }));
+            }
             const upsertMany = db.transaction((rows) => { rows.forEach(r => upsertHost.run(r)); });
-            const rows = infos.filter(info => info !== null).map(info => hostToRow(info, balances[info.address] || { xah: 0, evr: 0 }));
+            const rows = infos.filter(info => info !== null).map(info =>
+                hostToRow(info, balances[info.address] || { xah: 0, evr: 0 }, asnMap[info.address] || {})
+            );
             upsertMany(rows);
             processed += batch.length;
             active += activeInBatch.length;
@@ -488,8 +695,8 @@ app.get('/hosts', (req, res) => {
     let where = [], params = [];
 
     if (active !== undefined)             { where.push('active = ?');                             params.push(active === 'true' || active === '1' ? 1 : 0); }
-    // Exclude reported hosts unless explicitly requested
-    if (req.query.includeReported !== 'true') { where.push('(reported = 0 OR reported IS NULL OR reportedAt < ?)'); params.push(Date.now() - (7 * 24 * 60 * 60 * 1000)); }
+    // Exclude flagged/reported hosts unless explicitly requested
+    if (req.query.includeFlagged !== 'true') { where.push('(flagged = 0 OR flagged IS NULL) AND (reported = 0 OR reported IS NULL)'); }
     if (minSlots !== undefined)           { where.push('availableInstances >= ?');                params.push(parseInt(minSlots)); }
     if (maxSlots !== undefined)           { where.push('availableInstances <= ?');                params.push(parseInt(maxSlots)); }
     if (minRep !== undefined) {
@@ -515,6 +722,21 @@ app.get('/hosts', (req, res) => {
     if (reputedOnHeartbeat !== undefined) { where.push('reputedOnHeartbeat = ?');                 params.push(reputedOnHeartbeat === 'true' || reputedOnHeartbeat === '1' ? 1 : 0); }
     if (minAccumulatedReward !== undefined) { where.push('CAST(accumulatedReward AS REAL) >= ?'); params.push(parseFloat(minAccumulatedReward)); }
     if (req.query.minLastHeartbeat !== undefined) { where.push('lastHeartbeatTime >= ?'); params.push(Date.now() - (parseInt(req.query.minLastHeartbeat) * 60000)); }
+    if (req.query.hostingType !== undefined)       { where.push('hostingType = ?');            params.push(req.query.hostingType); }
+    if (req.query.asnOrg !== undefined) {
+        const values = req.query.asnOrg.split(',').map(s => s.trim()).filter(Boolean);
+        if (values.length) {
+            where.push('(' + values.map(() => 'asnOrg LIKE ?').join(' OR ') + ')');
+            values.forEach(v => params.push('%' + v + '%'));
+        }
+    }
+    if (req.query.excludeAsnOrg !== undefined) {
+        const values = req.query.excludeAsnOrg.split(',').map(s => s.trim()).filter(Boolean);
+        values.forEach(v => {
+            where.push('(asnOrg NOT LIKE ? OR asnOrg IS NULL)');
+            params.push('%' + v + '%');
+        });
+    }
 
     // null / not-null filters
     if (hasDescription === 'true')  { where.push("description IS NOT NULL AND description != ''"); }
@@ -687,17 +909,141 @@ app.get('/hosts/random', (req, res) => {
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// POST /hosts/:address/report — report a dead/broken host
+// POST /hosts/:address/report — community report of a problematic host
 app.post('/hosts/:address/report', (req, res) => {
     const { address } = req.params;
-    const { reason } = req.body || {};
+    const { category, reason, evidence } = req.body || {};
+    const reporterIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
+
+    // Validate category
+    if (!category || !REPORT_CATEGORIES[category]) {
+        return res.status(400).json({
+            success: false,
+            error: `Invalid category. Must be one of: ${Object.keys(REPORT_CATEGORIES).join(', ')}`
+        });
+    }
+
+    // Reason required for all categories
+    if (!reason || reason.trim().length < 10) {
+        return res.status(400).json({ success: false, error: 'reason is required (minimum 10 characters)' });
+    }
+
     try {
         const host = db.prepare('SELECT address, domain FROM hosts WHERE address = ?').get(address);
         if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
-        db.prepare('UPDATE hosts SET reported = 1, reportedAt = ?, reportReason = ? WHERE address = ?')
-          .run(Date.now(), reason || null, address);
-        console.log(`[Report] Host reported: ${address} | domain: ${host.domain} | reason: ${reason || 'none'}`);
-        res.json({ success: true, message: `Host ${address} reported and excluded from searches for 7 days.` });
+
+        // Anti-abuse: one report per IP per host per 24h
+        const recentFromIp = db.prepare(`
+            SELECT COUNT(*) as count FROM host_reports
+            WHERE address = ? AND reporterIp = ? AND reportedAt >= ?
+        `).get(address, reporterIp, Date.now() - 86400000);
+        if (recentFromIp.count > 0) {
+            return res.status(429).json({ success: false, error: 'You have already reported this host in the last 24 hours.' });
+        }
+
+        const severity = REPORT_CATEGORIES[category];
+        insertReport.run({
+            address,
+            reportedAt: Date.now(),
+            reporterIp,
+            category,
+            reason:   reason.trim().slice(0, 500),
+            evidence: evidence ? evidence.trim().slice(0, 1000) : null,
+            severity,
+        });
+
+        const summary = refreshReportSummary(address);
+        console.log(`[Report] ${address} | ${host.domain || ''} | cat=${category} sev=${severity} score=${summary.score} flagged=${summary.flagged}`);
+
+        res.json({
+            success: true,
+            message: summary.flagged
+                ? `Host reported and flagged (score: ${summary.score}). It will be excluded from default searches.`
+                : `Report submitted (score: ${summary.score}/${REPORT_SCORE_FLAG_THRESHOLD} to flag).`,
+            reportScore: summary.score,
+            flagged: summary.flagged,
+        });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /hosts/:address/reports — view all community reports for a host
+app.get('/hosts/:address/reports', (req, res) => {
+    const { address } = req.params;
+    try {
+        const host = db.prepare('SELECT address, domain, flagged, reportCount, reportScore FROM hosts WHERE address = ?').get(address);
+        if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
+        const reports = db.prepare(`
+            SELECT id, reportedAt, category, reason, evidence, severity
+            FROM host_reports WHERE address = ?
+            ORDER BY reportedAt DESC
+        `).all(address);
+        res.json({ success: true, address, domain: host.domain, flagged: !!host.flagged, reportCount: host.reportCount, reportScore: host.reportScore, flagThreshold: REPORT_SCORE_FLAG_THRESHOLD, reports });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /hosts/flagged — all flagged/reported hosts
+app.get('/hosts/flagged', (req, res) => {
+    const { limit = 100, offset = 0, fields } = req.query;
+    const selectFields = parseFields(fields);
+    try {
+        const rows = db.prepare(`
+            SELECT ${selectFields} FROM hosts
+            WHERE flagged = 1 OR reported = 1
+            ORDER BY reportScore DESC, flaggedAt DESC
+            LIMIT ? OFFSET ?
+        `).all(Math.min(parseInt(limit)||100, 500), parseInt(offset)||0);
+        const total = db.prepare(`SELECT COUNT(*) as count FROM hosts WHERE flagged = 1 OR reported = 1`).get()?.count || 0;
+        const hosts = fields ? applyFields(rows, fields) : rows;
+        res.json({ success: true, ...buildPagination(total, limit, offset), count: hosts.length, hosts });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// GET /report-categories — list valid categories for the submission form
+app.get('/report-categories', (req, res) => {
+    res.json({
+        success: true,
+        categories: Object.entries(REPORT_CATEGORIES).map(([id, severity]) => ({ id, severity })),
+        flagThreshold: REPORT_SCORE_FLAG_THRESHOLD,
+        windowDays: 90,
+    });
+});
+
+// ── Admin endpoints (require ADMIN_TOKEN bearer auth) ─────────
+const requireAdmin = (req, res, next) => {
+    if (!ADMIN_TOKEN) return res.status(503).json({ success: false, error: 'Admin auth not configured (set ADMIN_TOKEN env var)' });
+    const auth = req.headers['authorization'] || '';
+    if (auth !== `Bearer ${ADMIN_TOKEN}`) return res.status(401).json({ success: false, error: 'Unauthorised' });
+    next();
+};
+
+// POST /admin/hosts/:address/flag — directly flag a host (pentest findings, manual review)
+app.post('/admin/hosts/:address/flag', requireAdmin, (req, res) => {
+    const { address } = req.params;
+    const { reason, unflag } = req.body || {};
+    try {
+        const host = db.prepare('SELECT address, domain FROM hosts WHERE address = ?').get(address);
+        if (!host) return res.status(404).json({ success: false, error: 'Host not found' });
+        if (unflag) {
+            db.prepare('UPDATE hosts SET flagged = 0, flaggedAt = NULL, flagReason = NULL WHERE address = ?').run(address);
+            console.log(`[Admin] Unflagged: ${address} | ${host.domain || ''}`);
+            return res.json({ success: true, message: `Host ${address} unflagged.` });
+        }
+        if (!reason || reason.trim().length < 5) return res.status(400).json({ success: false, error: 'reason required' });
+        db.prepare('UPDATE hosts SET flagged = 1, flaggedAt = ?, flagReason = ? WHERE address = ?')
+          .run(Date.now(), reason.trim().slice(0, 500), address);
+        console.log(`[Admin] Flagged: ${address} | ${host.domain || ''} | reason: ${reason}`);
+        res.json({ success: true, message: `Host ${address} flagged.`, domain: host.domain });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
+});
+
+// DELETE /admin/hosts/:address/reports — clear all reports for a host (false positive cleanup)
+app.delete('/admin/hosts/:address/reports', requireAdmin, (req, res) => {
+    const { address } = req.params;
+    try {
+        const { changes } = db.prepare('DELETE FROM host_reports WHERE address = ?').run(address);
+        db.prepare('UPDATE hosts SET reportCount = 0, reportScore = 0, flagged = 0, flaggedAt = NULL, flagReason = NULL WHERE address = ?').run(address);
+        console.log(`[Admin] Cleared ${changes} report(s) for ${address}`);
+        res.json({ success: true, message: `Cleared ${changes} report(s) for ${address}.` });
     } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
@@ -731,6 +1077,89 @@ app.get('/countries', (req, res) => {
         GROUP BY countryCode ORDER BY total DESC
     `).all();
     res.json({ success: true, countries });
+});
+
+// GET /providers — ASN provider breakdown with centralisation metrics
+app.get('/providers', (req, res) => {
+    try {
+        const { active: activeOnly } = req.query;
+        const activeFilter = activeOnly === 'false' ? '' : 'AND active = 1';
+
+        // Per-provider counts
+        const providers = db.prepare(`
+            SELECT
+                asnOrg,
+                hostingType,
+                COUNT(*) as total,
+                SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN active=1 THEN availableInstances ELSE 0 END) as availableSlots,
+                SUM(CASE WHEN active=1 THEN maxInstances ELSE 0 END) as totalSlots,
+                ROUND(AVG(CASE WHEN active=1 THEN hostReputation END), 1) as avgReputation,
+                MIN(CASE WHEN active=1 AND leaseDrops > 0 THEN leaseDrops END) as minLeaseDrops,
+                MAX(CASE WHEN active=1 THEN leaseDrops END) as maxLeaseDrops,
+                SUM(CASE WHEN flagged=1 THEN 1 ELSE 0 END) as flaggedCount
+            FROM hosts
+            WHERE asnOrg IS NOT NULL
+            GROUP BY asnOrg
+            HAVING SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) >= 1
+            ORDER BY active DESC
+        `).all();
+
+        // Totals for concentration calculation
+        const totals = db.prepare(`
+            SELECT
+                COUNT(*) as totalHosts,
+                SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) as totalActive
+            FROM hosts
+            WHERE asnOrg IS NOT NULL
+        `).get();
+
+        const totalActive = totals.totalActive || 1;
+        const totalHosts  = totals.totalHosts  || 1;
+
+        // Annotate each provider with share % and concentration flag
+        const enriched = providers.map(p => ({
+            ...p,
+            shareOfActive:  p.active  ? parseFloat((p.active  / totalActive * 100).toFixed(1)) : 0,
+            shareOfTotal:   p.total   ? parseFloat((p.total   / totalHosts  * 100).toFixed(1)) : 0,
+        }));
+
+        // Herfindahl-Hirschman Index (HHI) on active hosts — measures market concentration.
+        // HHI < 1500: competitive. 1500–2500: moderately concentrated. > 2500: highly concentrated.
+        const hhi = Math.round(
+            enriched.reduce((sum, p) => sum + Math.pow(p.shareOfActive, 2), 0)
+        );
+
+        // Hosting-type breakdown
+        const byType = db.prepare(`
+            SELECT
+                hostingType,
+                COUNT(*) as total,
+                SUM(CASE WHEN active=1 THEN 1 ELSE 0 END) as active
+            FROM hosts
+            WHERE hostingType IS NOT NULL
+            GROUP BY hostingType ORDER BY active DESC
+        `).all().map(t => ({
+            ...t,
+            shareOfActive: t.active ? parseFloat((t.active / totalActive * 100).toFixed(1)) : 0,
+        }));
+
+        // Unknown / unenriched count (ASN DB not loaded yet or IP unresolvable)
+        const unenriched = db.prepare(`
+            SELECT COUNT(*) as count FROM hosts WHERE asnOrg IS NULL AND active = 1
+        `).get()?.count || 0;
+
+        res.json({
+            success: true,
+            totalActive,
+            totalHosts,
+            unenrichedActive: unenriched,
+            hhi,
+            hhiRating: hhi < 1500 ? 'competitive' : hhi < 2500 ? 'moderate' : 'concentrated',
+            byType,
+            providers: enriched,
+        });
+    } catch(e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
 // GET /stats
@@ -791,6 +1220,7 @@ const main = async () => {
     console.log(`  Database   : ${DB_PATH}`);
     console.log('');
     await initEvernode();
+    await initAsn();
     app.listen(API_PORT, () => { console.log(`[API] Listening on http://localhost:${API_PORT}`); });
     subscribeHeartbeat();
     const lastScan  = getMeta('lastFullScan');
