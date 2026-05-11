@@ -8,3 +8,16 @@ evernode-host-api.jsbu
 public/index.html_purple
 public/index.html.save
 *.js_lastBU
+
+# MaxMind ASN database (downloaded separately, see README)
+GeoLite2-ASN.mmdb
+GeoLite2-ASN.tar.gz
+
+# Backup patterns
+*BU*
+*PREASN*
+*BEFOREASN*
+*.backup
+public/indextest.html
+public/index.ht
+public/index
